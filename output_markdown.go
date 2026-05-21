@@ -111,6 +111,14 @@ func (out *OutputMarkdown) Error(str ...string) {
 	fmt.Fprintln(out.w, strings.Join(str, " "))
 }
 
+func (out *OutputMarkdown) Debug(text ...any) {
+	writeDebugStderr(text...)
+}
+
+func (out *OutputMarkdown) Debugf(format string, args ...any) {
+	writeDebugfStderr(format, args...)
+}
+
 func (out *OutputMarkdown) Fatal(msg string, code ...int) {
 	fmt.Fprintln(out.w, msg)
 

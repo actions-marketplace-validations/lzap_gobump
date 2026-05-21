@@ -32,6 +32,14 @@ func (out *OutputNone) Println(text ...string) {
 func (out *OutputNone) Error(str ...string) {
 }
 
+func (out *OutputNone) Debug(text ...any) {
+	writeDebugStderr(text...)
+}
+
+func (out *OutputNone) Debugf(format string, args ...any) {
+	writeDebugfStderr(format, args...)
+}
+
 func (out *OutputNone) Fatal(msg string, code ...int) {
 }
 

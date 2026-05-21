@@ -70,6 +70,14 @@ func (out *OutputConsole) Error(str ...string) {
 	fmt.Fprintln(os.Stderr, color(strings.Join(str, " "), ColorRed))
 }
 
+func (out *OutputConsole) Debug(text ...any) {
+	writeDebugStderr(text...)
+}
+
+func (out *OutputConsole) Debugf(format string, args ...any) {
+	writeDebugfStderr(format, args...)
+}
+
 func (out *OutputConsole) Fatal(msg string, code ...int) {
 	fmt.Fprintln(os.Stderr, msg)
 

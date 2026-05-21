@@ -33,14 +33,14 @@ func validateUpgrade(originalMod, newMod *modfile.File) error {
 func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*modfile.File, bool, bool) {
 	var success bool
 	var noProxyVersions bool
-	out.BeginPreformatted(config.GoBinary, "get", r.Mod.Path)
-	defer out.EndPreformattedCond(!success)
+	out.Debug("bump module", r.Mod.Path, "from", r.Mod.Version)
 
 	versions, err := proxy.FetchVersions(r.Mod.Path, r.Mod.Version)
 	if err != nil {
 		out.Error("failed to fetch versions:", err.Error())
 		return okMod, success, false
 	}
+	out.Debug("proxy returned", len(versions), "newer version(s) for", r.Mod.Path)
 	if len(versions) == 0 {
 		success = true
 		noProxyVersions = true
@@ -53,6 +53,7 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 			break
 		}
 
+		out.Debug("attempt", vi+1, "of", min(config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
 		newMod, err := attemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
 			out.Error("upgrade unsuccessful, reverting go.mod")
@@ -70,9 +71,7 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 			continue
 		}
 
-		if config.Verbose {
-			out.Println("compare", okMod.Go.Version, " => ", newMod.Go.Version)
-		}
+		out.Debug("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
 		if !runCommands(okMod) {
 			continue
@@ -91,16 +90,15 @@ func runCommands(revertTo *modfile.File) bool {
 		if c == "" {
 			continue
 		}
-		out.BeginPreformatted(c)
+		out.Debug("running -exec:", c)
 		if err := cmds(c); err != nil {
 			out.Error("tests failed, reverting go.mod")
 			if err := saveMod(config.GoModDst, revertTo); err != nil {
 				out.Error("failed to revert go.mod:", err.Error())
 			}
-			out.EndPreformattedCond(false)
 			return false
 		}
-		out.EndPreformattedCond(true)
+		out.Debug("-exec succeeded:", c)
 	}
 	return true
 }
@@ -161,10 +159,12 @@ func process(original *modfile.File) []Result {
 
 		if perDepGit {
 			if !upgradeSuccess {
+				out.Debug("git reset/clean after failed bump for", r.Mod.Path)
 				if err := gitResetHardHEAD(); err != nil {
 					out.Error("git reset/clean failed:", err.Error())
 				}
 			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
+				out.Debug("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
 				if err := gitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
 					out.Error("git commit failed:", err.Error())
 				}

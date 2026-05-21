@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,31 +17,75 @@ const (
 	ERR_GIT   = 6
 )
 
-// cmd runs a subprocess; when verbose, echoes the command and streams stdout/stderr to out
-// (intended for go get and -exec inside a preformatted block).
+// cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via out.Debug.
 func cmd(name string, args ...string) error {
 	return runCmd(name, args, true)
 }
 
-// cmdQuiet runs a subprocess without writing to out (e.g. go mod tidy before git commit).
-func cmdQuiet(name string, args ...string) error {
-	return runCmd(name, args, false)
+func cmdline(name string, args []string) string {
+	if len(args) == 0 {
+		return name
+	}
+	return name + " " + strings.Join(args, " ")
+}
+
+func logCmdResult(cmdline string, stdout, stderr *bytes.Buffer, err error) {
+	exitCode := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	out.Debugf("exit code: %d", exitCode)
+	if stdout.Len() > 0 {
+		out.Debug("stdout:\n" + stdout.String())
+	}
+	if stderr.Len() > 0 {
+		out.Debug("stderr:\n" + stderr.String())
+	}
+	if err != nil {
+		out.Debug("command failed:", err.Error())
+	}
 }
 
 func runCmd(name string, args []string, logOutput bool) error {
-	if logOutput && config.Verbose {
-		out.Println(name, strings.Join(args, " "))
+	line := cmdline(name, args)
+	if logOutput && debugEnabled() {
+		out.Debug("running:", line)
 	}
 	c := exec.Command(name, args...)
 	c.Env = os.Environ()
-	if logOutput && config.Verbose {
-		c.Stdout = out
-		c.Stderr = out
+	var stdout, stderr bytes.Buffer
+	if logOutput && debugEnabled() {
+		c.Stdout = &stdout
+		c.Stderr = &stderr
 	}
-	if err := c.Run(); err != nil {
-		return err
+	err := c.Run()
+	if logOutput && debugEnabled() {
+		logCmdResult(line, &stdout, &stderr, err)
 	}
-	return nil
+	return err
+}
+
+func runCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
+	if !logOutput || !debugEnabled() {
+		c := exec.Command(name, args...)
+		c.Env = os.Environ()
+		return c.Output()
+	}
+	line := cmdline(name, args)
+	out.Debug("running:", line)
+	c := exec.Command(name, args...)
+	c.Env = os.Environ()
+	var stdout, stderr bytes.Buffer
+	c.Stdout = &stdout
+	c.Stderr = &stderr
+	err := c.Run()
+	logCmdResult(line, &stdout, &stderr, err)
+	return stdout.Bytes(), err
 }
 
 var ErrCmd = fmt.Errorf("command error")

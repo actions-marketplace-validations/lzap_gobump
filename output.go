@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -13,6 +14,8 @@ type Output interface {
 	EndPreformattedCond(render bool, text ...any)
 	End(text ...any)
 	Error(str ...string)
+	Debug(text ...any)
+	Debugf(format string, args ...any)
 	Fatal(msg string, code ...int)
 	Write(buf []byte) (int, error)
 	Println(text ...string)
@@ -36,4 +39,22 @@ func strOrDash(str string) string {
 		return "-"
 	}
 	return str
+}
+
+func debugEnabled() bool {
+	return config != nil && config.Verbose
+}
+
+func writeDebugStderr(text ...any) {
+	if !debugEnabled() || len(text) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stderr, joinAny(text...))
+}
+
+func writeDebugfStderr(format string, args ...any) {
+	if !debugEnabled() {
+		return
+	}
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }

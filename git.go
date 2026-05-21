@@ -38,7 +38,7 @@ func errIfUnsafeGitWorktree() error {
 }
 
 func gitHasUncommittedChanges() bool {
-	outBytes, err := exec.Command("git", "status", "--porcelain").Output()
+	outBytes, err := gitOutput("status", "--porcelain")
 	if err != nil {
 		// If status fails inside a work tree, treat as unsafe.
 		return true
@@ -47,7 +47,7 @@ func gitHasUncommittedChanges() bool {
 }
 
 func gitInsideWorkTree() bool {
-	outBytes, err := exec.Command("git", "rev-parse", "--is-inside-work-tree").Output()
+	outBytes, err := gitOutput("rev-parse", "--is-inside-work-tree")
 	if err != nil {
 		return false
 	}
@@ -55,9 +55,11 @@ func gitInsideWorkTree() bool {
 }
 
 func gitRun(args ...string) error {
-	c := exec.Command("git", args...)
-	c.Env = os.Environ()
-	return c.Run()
+	return runCmd("git", args, true)
+}
+
+func gitOutput(args ...string) ([]byte, error) {
+	return runCmdOutput("git", args, true)
 }
 
 func goModSumPathsForGit() []string {
@@ -73,7 +75,7 @@ func goModSumPathsForGit() []string {
 func gitWorktreeDiffersFromHEAD() bool {
 	paths := goModSumPathsForGit()
 	args := append([]string{"diff", "--quiet", "HEAD", "--"}, paths...)
-	err := exec.Command("git", args...).Run()
+	err := gitRun(args...)
 	if err == nil {
 		return false
 	}
@@ -105,7 +107,7 @@ func gitEnsureUserIdentity() error {
 }
 
 func goModTidy() error {
-	if err := cmdQuiet(config.GoBinary, "mod", "tidy"); err != nil {
+	if err := cmd(config.GoBinary, "mod", "tidy"); err != nil {
 		return fmt.Errorf("go mod tidy: %w", err)
 	}
 	return nil
@@ -132,7 +134,7 @@ func gitCommitDependencyBump(modulePath, versionBefore, versionAfter string) err
 		}
 		absPaths = append(absPaths, abs)
 	}
-	topBytes, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	topBytes, err := gitOutput("rev-parse", "--show-toplevel")
 	if err != nil {
 		return fmt.Errorf("git rev-parse --show-toplevel: %w", err)
 	}
