@@ -25,8 +25,11 @@ func attemptUpgrade(modulePath, version string) (*modfile.File, error) {
 
 // ValidateUpgrade checks if the upgrade is valid.
 func ValidateUpgrade(originalMod, newMod *modfile.File) error {
-	if originalMod == nil || newMod == nil || originalMod.Go == nil || newMod.Go == nil {
-		return fmt.Errorf("parsing error")
+	if originalMod == nil || originalMod.Go == nil {
+		return fmt.Errorf("original go.mod is missing or has no go directive")
+	}
+	if newMod == nil || newMod.Go == nil {
+		return fmt.Errorf("upgraded go.mod is missing or has no go directive")
 	}
 	if normalizeVersion(originalMod.Go.Version) != normalizeVersion(newMod.Go.Version) {
 		return fmt.Errorf("upgrade changes required Go version %s => %s", originalMod.Go.Version, newMod.Go.Version)
