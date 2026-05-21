@@ -86,6 +86,49 @@ func GitWorktreeDiffersFromHEAD() bool {
 	return false
 }
 
+// gitRelGoModSumPaths returns go.mod and go.sum paths relative to the repository root.
+func gitRelGoModSumPaths() ([]string, error) {
+	paths := GoModSumPathsForGit()
+	absPaths := make([]string, 0, len(paths))
+	for _, p := range paths {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return nil, err
+		}
+		absPaths = append(absPaths, abs)
+	}
+	topBytes, err := GitOutput("rev-parse", "--show-toplevel")
+	if err != nil {
+		return nil, fmt.Errorf("git rev-parse --show-toplevel: %w", err)
+	}
+	top := strings.TrimSpace(string(topBytes))
+	relPaths := make([]string, len(absPaths))
+	for i, ap := range absPaths {
+		rel, err := filepath.Rel(top, ap)
+		if err != nil {
+			return nil, err
+		}
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, fmt.Errorf("go.mod path %s is outside git top-level %s", ap, top)
+		}
+		relPaths[i] = filepath.ToSlash(rel)
+	}
+	return relPaths, nil
+}
+
+// GitDiscardGoModSumChanges restores go.mod and go.sum to the last commit without touching other files.
+func GitDiscardGoModSumChanges() error {
+	relPaths, err := gitRelGoModSumPaths()
+	if err != nil {
+		return err
+	}
+	args := append([]string{"checkout", "HEAD", "--"}, relPaths...)
+	if err := GitRun(args...); err != nil {
+		return fmt.Errorf("git checkout HEAD -- go.mod/go.sum: %w", err)
+	}
+	return nil
+}
+
 func GitResetHardHEAD() error {
 	if err := GitRun("reset", "--hard", "HEAD"); err != nil {
 		return fmt.Errorf("git reset --hard HEAD: %w", err)
@@ -120,35 +163,14 @@ func GitCommitDependencyBump(modulePath, versionBefore, versionAfter string) err
 	if err := GoModTidy(); err != nil {
 		return err
 	}
-	paths := GoModSumPathsForGit()
-	for _, p := range paths {
+	for _, p := range GoModSumPathsForGit() {
 		if _, err := os.Stat(p); err != nil {
 			return fmt.Errorf("git add: %w", err)
 		}
 	}
-	absPaths := make([]string, 0, len(paths))
-	for _, p := range paths {
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return err
-		}
-		absPaths = append(absPaths, abs)
-	}
-	topBytes, err := GitOutput("rev-parse", "--show-toplevel")
+	relPaths, err := gitRelGoModSumPaths()
 	if err != nil {
-		return fmt.Errorf("git rev-parse --show-toplevel: %w", err)
-	}
-	top := strings.TrimSpace(string(topBytes))
-	relPaths := make([]string, len(absPaths))
-	for i, ap := range absPaths {
-		rel, err := filepath.Rel(top, ap)
-		if err != nil {
-			return err
-		}
-		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("go.mod path %s is outside git top-level %s", ap, top)
-		}
-		relPaths[i] = filepath.ToSlash(rel)
+		return err
 	}
 	addArgs := append([]string{"add", "--"}, relPaths...)
 	if err := GitRun(addArgs...); err != nil {

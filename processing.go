@@ -173,6 +173,14 @@ func Process(original *modfile.File) []Result {
 				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
 				if err := GitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
 					Err.Println("git commit failed:", err.Error())
+					if err := GitDiscardGoModSumChanges(); err != nil {
+						Err.Println("git discard go.mod/go.sum failed:", err.Error())
+					}
+					if okMod, err = ParseMod(Config.GoModSrc); err != nil {
+						Fatal(err.Error(), ERR_PARSE)
+					}
+					upgradeSuccess = false
+					versionAfter = r.Mod.Version
 				}
 			}
 		}
