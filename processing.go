@@ -54,26 +54,32 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 		}
 
 		Debug.Println("attempt", vi+1, "of", min(Config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
+		sumSnap, hadSum, sumErr := ReadGoSumSnapshot(Config.GoModDst)
+		if sumErr != nil {
+			Debug.Println("failed to read go.sum snapshot:", sumErr.Error())
+			break
+		}
+
 		newMod, err := AttemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
-			Debug.Println("upgrade unsuccessful, reverting go.mod")
-			if err := SaveMod(Config.GoModDst, okMod); err != nil {
-				Debug.Println("failed to revert go.mod:", err.Error())
+			Debug.Println("upgrade unsuccessful, reverting go.mod and go.sum")
+			if err := RestoreModuleState(Config.GoModDst, okMod, sumSnap, hadSum); err != nil {
+				Debug.Println("failed to revert module state:", err.Error())
 			}
 			continue
 		}
 
 		if err := ValidateUpgrade(okMod, newMod); err != nil {
-			Debug.Printf("%s; reverting go.mod\n", err.Error())
-			if err := SaveMod(Config.GoModDst, okMod); err != nil {
-				Debug.Println("failed to revert go.mod:", err.Error())
+			Debug.Printf("%s; reverting go.mod and go.sum\n", err.Error())
+			if err := RestoreModuleState(Config.GoModDst, okMod, sumSnap, hadSum); err != nil {
+				Debug.Println("failed to revert module state:", err.Error())
 			}
 			continue
 		}
 
 		Debug.Println("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
-		if !RunCommands(okMod) {
+		if !RunCommands(okMod, sumSnap, hadSum) {
 			continue
 		}
 
@@ -84,17 +90,17 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 }
 
 // RunCommands executes post-upgrade commands against the current go.mod on disk
-// (expected to match a successful upgrade). On failure it restores revertTo.
-func RunCommands(revertTo *modfile.File) bool {
+// (expected to match a successful upgrade). On failure it restores revertTo and sumSnap.
+func RunCommands(revertTo *modfile.File, sumSnap []byte, hadSum bool) bool {
 	for _, c := range Config.Commands {
 		if c == "" {
 			continue
 		}
 		Debug.Println("running -exec:", c)
 		if err := Cmds(c); err != nil {
-			Debug.Println("exec failed, reverting go.mod")
-			if err := SaveMod(Config.GoModDst, revertTo); err != nil {
-				Debug.Println("failed to revert go.mod:", err.Error())
+			Debug.Println("exec failed, reverting go.mod and go.sum")
+			if err := RestoreModuleState(Config.GoModDst, revertTo, sumSnap, hadSum); err != nil {
+				Debug.Println("failed to revert module state:", err.Error())
 			}
 			return false
 		}
