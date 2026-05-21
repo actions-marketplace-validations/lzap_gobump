@@ -109,11 +109,45 @@ func RunCommands(revertTo *modfile.File, sumSnap []byte, hadSum bool) bool {
 	return true
 }
 
+func ValidateRequestedDependencies(original *modfile.File) error {
+	if len(Config.Dependencies) == 0 {
+		return nil
+	}
+	direct := make(map[string]*modfile.Require)
+	indirect := make(map[string]bool)
+	for _, r := range original.Require {
+		if r.Indirect {
+			indirect[r.Mod.Path] = true
+			continue
+		}
+		direct[r.Mod.Path] = r
+	}
+	var problems []string
+	for _, name := range Config.Dependencies {
+		if _, ok := direct[name]; ok {
+			continue
+		}
+		if indirect[name] {
+			problems = append(problems, fmt.Sprintf("%q is an indirect dependency", name))
+			continue
+		}
+		problems = append(problems, fmt.Sprintf("%q is not a direct dependency in go.mod", name))
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("unknown positional module(s): %s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
 func Process(original *modfile.File) []Result {
 	var results []Result
 	proxy := NewGoProxy(Config.ModuleProxy)
 	okMod, err := ParseMod(Config.GoModSrc)
 	if err != nil {
+		Fatal(err.Error(), ERR_PARSE)
+	}
+
+	if err := ValidateRequestedDependencies(original); err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
 
