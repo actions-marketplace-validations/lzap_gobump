@@ -8,11 +8,22 @@ import (
 	"strings"
 )
 
+// Exit codes
+const (
+	ERR_READ  = 2
+	ERR_WRITE = 3
+	ERR_PARSE = 4
+	ERR_CMD   = 5
+	ERR_GIT   = 6
+)
+
 var (
 	Out   *log.Logger
 	Debug *verboseLogger
 	Err   *log.Logger
 )
+
+var errCmd = fmt.Errorf("command error")
 
 // verboseLogger writes to w only when Config.Verbose is true.
 type verboseLogger struct {
