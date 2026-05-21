@@ -9,14 +9,6 @@ import (
 	"strings"
 )
 
-const (
-	ERR_READ  = 2
-	ERR_WRITE = 3
-	ERR_PARSE = 4
-	ERR_CMD   = 5
-	ERR_GIT   = 6
-)
-
 // Cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via Debug.
 func Cmd(name string, args ...string) error {
 	return RunCmd(name, args, true)
@@ -29,7 +21,7 @@ func Cmdline(name string, args []string) string {
 	return name + " " + strings.Join(args, " ")
 }
 
-func LogCmdResult(Cmdline string, stdout, stderr *bytes.Buffer, err error) {
+func LogCmdResult(line string, stdout, stderr *bytes.Buffer, err error) {
 	exitCode := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -87,8 +79,6 @@ func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 	LogCmdResult(line, &stdout, &stderr, err)
 	return stdout.Bytes(), err
 }
-
-var ErrCmd = fmt.Errorf("command error")
 
 func Cmds(str string) error {
 	parts := strings.Fields(str)

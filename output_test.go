@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func withLoggers(t *testing.T, stdout, stderr io.Writer, verbose bool, format string) {
+func WithLoggers(t *testing.T, stdout, stderr io.Writer, verbose bool, format string) {
 	t.Helper()
 	Config = &AppConfig{Verbose: verbose, Format: format}
 	InitLoggers()
@@ -27,7 +27,7 @@ func withLoggers(t *testing.T, stdout, stderr io.Writer, verbose bool, format st
 
 func TestPrintMarkdownResults(t *testing.T) {
 	var buf bytes.Buffer
-	withLoggers(t, &buf, nil, false, "markdown")
+	WithLoggers(t, &buf, nil, false, "markdown")
 
 	PrintMarkdownResults([]Result{
 		{
@@ -57,7 +57,7 @@ Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-
 
 func TestPrintMarkdownMinimalStdout(t *testing.T) {
 	var buf bytes.Buffer
-	withLoggers(t, &buf, nil, false, "markdown")
+	WithLoggers(t, &buf, nil, false, "markdown")
 
 	PrintMarkdownHeader()
 	PrintMarkdownResults([]Result{
@@ -85,7 +85,7 @@ Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-
 
 func TestPrintConsoleResults(t *testing.T) {
 	var buf bytes.Buffer
-	withLoggers(t, &buf, nil, false, "console")
+	WithLoggers(t, &buf, nil, false, "console")
 
 	PrintConsoleResults([]Result{
 		{
@@ -115,7 +115,7 @@ func TestPrintConsoleResults(t *testing.T) {
 
 func TestDebugDiscardedWhenNotVerbose(t *testing.T) {
 	var stderr bytes.Buffer
-	withLoggers(t, nil, &stderr, false, "none")
+	WithLoggers(t, nil, &stderr, false, "none")
 
 	Debug.Println("should not appear")
 	if stderr.Len() != 0 {
@@ -125,7 +125,7 @@ func TestDebugDiscardedWhenNotVerbose(t *testing.T) {
 
 func TestErrAlwaysWrites(t *testing.T) {
 	var stderr bytes.Buffer
-	withLoggers(t, nil, &stderr, false, "none")
+	WithLoggers(t, nil, &stderr, false, "none")
 
 	Err.Println("visible error")
 	if !strings.Contains(stderr.String(), "visible error") {

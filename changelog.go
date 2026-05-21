@@ -10,6 +10,15 @@ import (
 	"strings"
 )
 
+// GitHubToken returns a token for GitHub API calls (changelog compare, gist).
+// GH_TOKEN is set by the GitHub CLI and many CI setups; GITHUB_TOKEN is the Actions default.
+func GitHubToken() string {
+	if t := os.Getenv("GITHUB_TOKEN"); t != "" {
+		return t
+	}
+	return os.Getenv("GH_TOKEN")
+}
+
 // GitHubCommit represents a single commit in the GitHub API response.
 type GitHubCommit struct {
 	SHA    string `json:"sha"`
@@ -50,8 +59,8 @@ func ShortCommitSHA(sha string) string {
 	return sha[:7]
 }
 
-// GithubRepoFromOriginURL maps a module VCS origin URL to a GitHub owner/repo for compare API calls.
-func GithubRepoFromOriginURL(originURL string) (owner, repo string, ok bool) {
+// GitHubRepoFromOriginURL maps a module VCS origin URL to a GitHub owner/repo for compare API calls.
+func GitHubRepoFromOriginURL(originURL string) (owner, repo string, ok bool) {
 	originURL = strings.TrimSuffix(strings.TrimSpace(originURL), "/")
 	switch {
 	case strings.HasPrefix(originURL, "https://github.com/"):
@@ -92,7 +101,7 @@ func FetchGitHubCompare(owner, repo, compareRange string) (GitHubCompareResponse
 		return compareResp, 0, fmt.Errorf("failed to build GitHub request: %w", err)
 	}
 	SetDefaultHTTPHeaders(req)
-	if tok := GithubToken(); tok != "" {
+	if tok := GitHubToken(); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	resp, err := NewHTTPClient().Do(req)
@@ -121,9 +130,9 @@ func GetChangelog(modulePath, fromVersion, toVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	owner, repo, ok := GithubRepoFromOriginURL(toInfo.Origin.URL)
+	owner, repo, ok := GitHubRepoFromOriginURL(toInfo.Origin.URL)
 	if !ok {
-		owner, repo, ok = GithubRepoFromOriginURL(fromInfo.Origin.URL)
+		owner, repo, ok = GitHubRepoFromOriginURL(fromInfo.Origin.URL)
 	}
 	if !ok {
 		return "", nil
@@ -227,7 +236,7 @@ func PrintChangelogs(results []Result) {
 				}
 			}
 		}
-		token := GithubToken()
+		token := GitHubToken()
 		if token == "" {
 			Err.Println("Failed to create Gist: no GITHUB_TOKEN or GH_TOKEN set")
 			return

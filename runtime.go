@@ -11,8 +11,8 @@ var (
 	// Use linker flag to customize it: -X 'github.com/lzap/gobump.BuildCommit=1234567
 	BuildCommit string = "HEAD"
 
-	// Use linker flag to customize it: -X 'github.com/lzap/gobump.buildTime=2021-01-01T00:00:00Z'
-	buildTime string
+	// Use linker flag to customize it: -X 'github.com/lzap/gobump.BuildTimestamp=2021-01-01T00:00:00Z'
+	BuildTimestamp string
 )
 
 func init() {
@@ -24,7 +24,7 @@ func init() {
 					BuildCommit = bs.Value[0:BuildCommitChars]
 				}
 			case "vcs.time":
-				buildTime = bs.Value
+				BuildTimestamp = bs.Value
 			}
 		}
 	}
@@ -38,5 +38,5 @@ func BuildID() string {
 
 // BuildTime returns the build time, if available.
 func BuildTime() string {
-	return buildTime
+	return BuildTimestamp
 }

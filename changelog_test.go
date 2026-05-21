@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGithubRepoFromOriginURL(t *testing.T) {
+func TestGitHubRepoFromOriginURL(t *testing.T) {
 	tests := []struct {
 		url       string
 		wantOwner string
@@ -18,9 +18,9 @@ func TestGithubRepoFromOriginURL(t *testing.T) {
 		{"https://example.com/foo", "", "", false},
 	}
 	for _, tt := range tests {
-		owner, repo, ok := GithubRepoFromOriginURL(tt.url)
+		owner, repo, ok := GitHubRepoFromOriginURL(tt.url)
 		if ok != tt.wantOK || owner != tt.wantOwner || repo != tt.wantRepo {
-			t.Errorf("GithubRepoFromOriginURL(%q) = (%q, %q, %v), want (%q, %q, %v)",
+			t.Errorf("GitHubRepoFromOriginURL(%q) = (%q, %q, %v), want (%q, %q, %v)",
 				tt.url, owner, repo, ok, tt.wantOwner, tt.wantRepo, tt.wantOK)
 		}
 	}
