@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+// ============================================================================
+// GitHub API Types and Helpers
+// ============================================================================
+
 func githubToken() string {
 	if t := os.Getenv("GITHUB_TOKEN"); t != "" {
 		return t
@@ -85,6 +89,10 @@ func formatGitHubCompareCommits(commits []githubCommit) string {
 	return changelog.String()
 }
 
+// ============================================================================
+// GitHub API - Fetch Compare
+// ============================================================================
+
 func fetchGitHubCompare(owner, repo, compareRange string) (githubCompareResponse, int, error) {
 	var compareResp githubCompareResponse
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/compare/%s", owner, repo, compareRange)
@@ -110,6 +118,10 @@ func fetchGitHubCompare(owner, repo, compareRange string) (githubCompareResponse
 	}
 	return compareResp, resp.StatusCode, nil
 }
+
+// ============================================================================
+// Changelog Operations
+// ============================================================================
 
 // GetChangelog fetches upstream commits between two module versions via the module proxy and GitHub.
 func GetChangelog(modulePath, fromVersion, toVersion string) (string, error) {
@@ -162,6 +174,10 @@ func formatModuleChangelog(modulePath, versionBefore, versionAfter string) strin
 	return sb.String()
 }
 
+// ============================================================================
+// Gist Operations
+// ============================================================================
+
 func createGist(token, description, content string) (string, error) {
 	gistRequest := gistRequest{
 		Description: description,
@@ -205,6 +221,10 @@ func createGist(token, description, content string) (string, error) {
 
 	return respBody.HTMLURL, nil
 }
+
+// ============================================================================
+// Output
+// ============================================================================
 
 // PrintChangelogs prints the changelogs for all updated modules.
 func PrintChangelogs(results []Result) {
