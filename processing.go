@@ -19,11 +19,14 @@ func AttemptUpgrade(modulePath, version string) (*modfile.File, error) {
 
 // ValidateUpgrade checks if the upgrade is valid.
 func ValidateUpgrade(originalMod, newMod *modfile.File) error {
-	if newMod == nil || newMod.Go == nil {
+	if originalMod == nil || newMod == nil || originalMod.Go == nil || newMod.Go == nil {
 		return fmt.Errorf("parsing error")
 	}
 	if strings.TrimSuffix(originalMod.Go.Version, ".0") != strings.TrimSuffix(newMod.Go.Version, ".0") {
 		return fmt.Errorf("upgrade changes required Go version %s => %s", originalMod.Go.Version, newMod.Go.Version)
+	}
+	if toolchainIdentity(originalMod) != toolchainIdentity(newMod) {
+		return fmt.Errorf("upgrade changes toolchain %s => %s", toolchainLabel(originalMod), toolchainLabel(newMod))
 	}
 	return nil
 }

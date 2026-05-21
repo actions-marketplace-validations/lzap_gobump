@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -49,7 +48,7 @@ func RunCmd(name string, args []string, logOutput bool) error {
 		Debug.Println("running:", line)
 	}
 	c := exec.Command(name, args...)
-	c.Env = os.Environ()
+	c.Env = subprocessEnv(name)
 	var stdout, stderr bytes.Buffer
 	if logOutput && DebugEnabled() {
 		c.Stdout = &stdout
@@ -65,13 +64,13 @@ func RunCmd(name string, args []string, logOutput bool) error {
 func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 	if !logOutput || !DebugEnabled() {
 		c := exec.Command(name, args...)
-		c.Env = os.Environ()
+		c.Env = subprocessEnv(name)
 		return c.Output()
 	}
 	line := Cmdline(name, args)
 	Debug.Println("running:", line)
 	c := exec.Command(name, args...)
-	c.Env = os.Environ()
+	c.Env = subprocessEnv(name)
 	var stdout, stderr bytes.Buffer
 	c.Stdout = &stdout
 	c.Stderr = &stderr

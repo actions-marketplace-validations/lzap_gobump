@@ -20,6 +20,13 @@ func main() {
 
 	InitLoggers()
 
+	if err := InitBundledToolchain(); err != nil {
+		Fatal(err.Error(), ERR_CMD)
+	}
+	if DebugEnabled() {
+		Debug.Printf("using bundled toolchain %s for go subprocesses (GOTOOLCHAIN)\n", bundledToolchain)
+	}
+
 	if err := ErrIfUnsafeGitWorktree(); err != nil {
 		Fatal(err.Error(), ERR_GIT)
 	}
@@ -33,6 +40,7 @@ func main() {
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
+	WarnIgnoredGoModToolchain(original)
 	originalSum, err := ReadGoSum()
 	if err != nil {
 		Fatal(err.Error(), ERR_READ)

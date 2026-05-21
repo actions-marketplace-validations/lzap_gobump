@@ -2,7 +2,7 @@
 
 Pins Go version when bumping dependencies.
 
-A simple tool that upgrades all direct dependencies one by one, ensuring the Go version statement in `go.mod` is never touched. This is useful if your build infrastructure lags behind the latest Go version and you are unable to upgrade, for example, when using Go from Linux distribution packages or a container runtime like the Red Hat Go Toolset for UBI.
+A simple tool that upgrades all direct dependencies one by one, ensuring the `go` version statement in `go.mod` is never touched. It runs all `go` commands with the bundled Go binary (via `GOTOOLCHAIN`) and does not honor a `toolchain` line in the project's `go.mod`. This is useful if your build infrastructure lags behind the latest Go version and you are unable to upgrade, for example, when using Go from Linux distribution packages or a container runtime like the Red Hat Go Toolset for UBI.
 
 ## The problem
 
@@ -93,11 +93,14 @@ With `-changelog`, upstream commits between the old and new module versions are 
 
 The utility can also take one or more module paths as positional arguments. When provided, only those dependencies will be updated, ignoring others. This is useful for targeting specific dependency updates.
 
-When no arguments are provided, `gobump` updates all direct dependencies. In this mode, it is important to always specify the `GOTOOLCHAIN` variable to match the version in your project's `go.mod` file. This is the version you want to pin and prevent from being upgraded.
+When no arguments are provided, `gobump` updates all direct dependencies. Run it with the Go toolchain you intend to use (for example the Red Hat Go Toolset or a specific `go` on `PATH`). Gobump sets `GOTOOLCHAIN` from that binary's `go env GOVERSION` for every `go` subprocess, ignoring any `toolchain` line in the project's `go.mod`. With `-verbose`, a warning is printed when such a `toolchain` line is present.
 
 ```
-GOTOOLCHAIN=go1.22.0 gobump
+go1.22.0 get github.com/lzap/gobump@latest
+go1.22.0 gobump
 ```
+
+Or set `GOVERSION=go1.22.0` so the `go` command resolves to that binary.
 
 By default, the module version list is fetched from the first usable URL in `GOPROXY` (same as the `go` command), or from `https://proxy.golang.org` when that is unset or only `direct`/`off` is configured. Override with `-proxy` if needed.
 
@@ -176,13 +179,12 @@ Tip: When building or testing in a container, use `-buildvcs=false` to avoid `gi
 
 * Loads the project's `go.mod` and stores it in memory.
 * For each direct dependency, it asks the configured module proxy for `@v/list`, then runs `go get MODULE@V` for up to `-retries` newer versions (newest first). This is not the same as `go get MODULE@latest` in one shot, but it walks backward through recent releases when an upgrade fails.
-* If the `go get` command fails (for example when `GOTOOLCHAIN` is pinned) or modifies the Go version in `go.mod`, it reverts to the last version of `go.mod` and tries again with the next lower version until it succeeds or runs out of attempts.
+* All `go` subprocesses use `GOTOOLCHAIN` from the bundled `go` binary (`go env GOVERSION`); the project's `toolchain` line in `go.mod` is not used (see `-verbose` for a warning when it is set).
+* If the `go get` command fails or modifies the `go` or `toolchain` lines in `go.mod`, it reverts `go.mod` and `go.sum` and tries again with the next lower version until it succeeds or runs out of attempts.
 * In a git repository, unless `-no-git` or `-dry-run` is set, gobump exits before doing any work if there are uncommitted changes (`git status --porcelain` is non-empty), so local edits are not mixed with automatic commits or `git reset`/`git clean` on failed bumps. Use `-no-git` when you intentionally want only `go.mod` / `go.sum` updates with no git integration.
 * When per-dependency git commits are enabled, each successful bump runs `go mod tidy`, then commits `go.mod` and `go.sum` as `chore(deps): update MODULE to VERSION`. With `-changelog`, the upstream git changelog for that module is appended to the commit message body (`-changelog-dest` is not used in this mode).
-* If and only if a module succeeds in updating to a newer version and one or more optional `exec` arguments are passed, it executes them for that candidate. If the proxy had no newer versions, `exec` is skipped for that module. If any `exec` fails, it reverts to the last good `go.mod` and tries the next older candidate version, up to the retry limit. The same applies when `go get` fails or the Go directive would change.
+* If and only if a module succeeds in updating to a newer version and one or more optional `exec` arguments are passed, it executes them for that candidate. If the proxy had no newer versions, `exec` is skipped for that module. If any `exec` fails, it reverts to the last good `go.mod` and tries the next older candidate version, up to the retry limit. The same applies when `go get` fails or the `go` / `toolchain` directives would change.
 * Repeats for every other direct dependency.
-
-It is recommended to set `GOTOOLCHAIN` to an explicit Go version to speed up the failure of `go get` because, with a specific Go version, it immediately fails and does not even attempt to download and install packages, which would lead to a `go.mod` change.
 
 ## Custom commands
 
@@ -192,7 +194,7 @@ For every updated dependency, it is possible to run one or more commands to ensu
 gobump -exec "go build ./..." -exec "go test ./..."
 ```
 
-Commands are not executed via a shell. Subprocesses will inherit the `GOTOOLCHAIN` setting, so it is fine to use just the `go` command or any version of Go later than 1.21, and it will pick up the correct toolchain.
+Commands are not executed via a shell. `go` commands in `-exec` receive the same bundled `GOTOOLCHAIN` as `go get` and `go mod tidy`.
 
 ## Ambiguous imports
 
@@ -214,7 +216,7 @@ go get google.golang.org/grpc/stats/opentelemetry@none
 
 ## Configuration
 
-It is possible to use a different binary than `go`; set the `GOVERSION=go1.21.0` environment variable to use a different Go version that is available through the `PATH`. But the recommended way of using specific Go tooling is via the `GOTOOLCHAIN` variable.
+It is possible to use a different binary than `go`; set the `GOVERSION=go1.21.0` environment variable to use a different Go version on `PATH`. Gobump derives `GOTOOLCHAIN` from that binary and does not read the project's `toolchain` line in `go.mod`.
 
 ## Limitations
 

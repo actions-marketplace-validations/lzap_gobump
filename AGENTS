@@ -6,7 +6,7 @@ Treat the module manifest as pinned. Do **not** edit `go.mod` or `go.sum` when b
 
 That includes:
 
-- The `go` toolchain line (must stay aligned with the pinned release; see the `go` directive in `go.mod`)
+- The `go` directive (must stay aligned with the pinned release; see `go.mod`). A `toolchain` line in a target project is ignored by gobump when bumping dependencies.
 - Existing `require` versions and indirect entries
 
 ## Commands that must not be run on this repo root (without care)
@@ -34,8 +34,10 @@ go fmt ./...
 Exercise gobump against **testdata** only, never the project module:
 
 ```bash
-( cd testdata/go-mod-middleware && GOTOOLCHAIN=go1.24.12 go run github.com/lzap/gobump@latest -dry-run -format none )
+( cd testdata/go-mod-middleware && go1.24.12 run github.com/lzap/gobump@latest -dry-run -format none )
 ```
+
+Gobump sets `GOTOOLCHAIN` from the invoked `go` binary; you do not need to match a `toolchain` line in fixture `go.mod` files.
 
 Other fixtures live under `testdata/go-mod-*` (each with its own `go.mod` and `go.sum`). Regenerate checksums after editing a fixture: `cd testdata/<case> && go mod download`.
 

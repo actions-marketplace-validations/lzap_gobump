@@ -87,10 +87,10 @@ runs:
       if: ${{ inputs.development == 'false' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
         GITHUB_TOKEN: ${{ inputs.token }}
       run: |
+        export GOTOOLCHAIN="$(go env GOVERSION)"
         go version
         go env
         go run github.com/lzap/gobump@latest -no-git=${{ inputs.no_git }} -user-name="${{ inputs.user_name }}" -user-email="${{ inputs.user_email }}" -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" ${{ inputs.include }} | tee /tmp/bump.log
@@ -99,9 +99,9 @@ runs:
       if: ${{ inputs.development == 'true' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
       run: |
+        export GOTOOLCHAIN="$(go env GOVERSION)"
         go version
         go env
         go get -v ./...
@@ -110,10 +110,10 @@ runs:
       if: ${{ inputs.development == 'true' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
         GITHUB_TOKEN: ${{ inputs.token }}
       run: |
+        export GOTOOLCHAIN="$(go env GOVERSION)"
         go version
         go env
         go run . -no-git=${{ inputs.no_git }} -user-name="${{ inputs.user_name }}" -user-email="${{ inputs.user_email }}" -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" ${{ inputs.include }} | tee /tmp/bump.log
