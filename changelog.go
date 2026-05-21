@@ -235,7 +235,7 @@ func PrintChangelogs(results []Result) {
 		if err != nil {
 			Err.Println("Failed to create Gist:", err.Error())
 		} else {
-			Debug.Println("Changelog Gist created:", gistURL)
+			Out.Println("Changelog Gist created:", gistURL)
 		}
 	} else {
 		sb := strings.Builder{}
