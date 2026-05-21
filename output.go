@@ -91,11 +91,11 @@ func PrintResults(results []Result) {
 	}
 }
 
-func PrintMarkdownHeader() {
+func printMarkdownHeader() {
 	Out.Println("## Pinned Go version dependency update")
 }
 
-func PrintMarkdownFooter() {
+func printMarkdownFooter() {
 	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", buildID())
 }
 
@@ -148,7 +148,7 @@ func consoleStatus(r Result) string {
 	return "err"
 }
 
-func PrintConsoleUpdate(path, version string) {
+func printConsoleUpdate(path, version string) {
 	if Config.Format != "console" {
 		return
 	}

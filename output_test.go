@@ -57,7 +57,7 @@ func TestPrintMarkdownMinimalStdout(t *testing.T) {
 	var buf bytes.Buffer
 	withLoggers(t, &buf, nil, false, "markdown")
 
-	PrintMarkdownHeader()
+	printMarkdownHeader()
 	PrintMarkdownResults([]Result{
 		{
 			ModulePath:    "example.com/mod",
@@ -66,7 +66,7 @@ func TestPrintMarkdownMinimalStdout(t *testing.T) {
 			VersionAfter:  "v2.0.0",
 		},
 	})
-	PrintMarkdownFooter()
+	printMarkdownFooter()
 
 	expected := `## Pinned Go version dependency update
 | Module | Status | Version |

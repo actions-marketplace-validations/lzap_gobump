@@ -58,7 +58,7 @@ func TestFetchVersions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
-			proxy := NewGoProxy(server.URL)
+			proxy := newGoProxy(server.URL)
 			versionsMod, err := proxy.FetchVersions("example.com/Module", tt.version)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)

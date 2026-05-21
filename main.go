@@ -29,8 +29,8 @@ func main() {
 	}
 
 	if Config.Format == "markdown" {
-		PrintMarkdownHeader()
-		defer PrintMarkdownFooter()
+		printMarkdownHeader()
+		defer printMarkdownFooter()
 	}
 
 	original, err := ParseMod(goModFile)

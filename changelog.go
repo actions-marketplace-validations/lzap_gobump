@@ -92,7 +92,7 @@ func fetchGitHubCompare(owner, repo, compareRange string) (githubCompareResponse
 	if err != nil {
 		return compareResp, 0, fmt.Errorf("failed to build GitHub request: %w", err)
 	}
-	SetDefaultHTTPHeaders(req)
+	setDefaultHTTPHeaders(req)
 	if tok := githubToken(); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
@@ -113,7 +113,7 @@ func fetchGitHubCompare(owner, repo, compareRange string) (githubCompareResponse
 
 // GetChangelog fetches upstream commits between two module versions via the module proxy and GitHub.
 func GetChangelog(modulePath, fromVersion, toVersion string) (string, error) {
-	proxy := NewGoProxy(Config.ModuleProxy)
+	proxy := newGoProxy(Config.ModuleProxy)
 	fromInfo, err := proxy.FetchVersionInfo(modulePath, fromVersion)
 	if err != nil {
 		return "", err
@@ -185,7 +185,7 @@ func createGist(token, description, content string) (string, error) {
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	SetDefaultHTTPHeaders(req)
+	setDefaultHTTPHeaders(req)
 
 	client := NewHTTPClient()
 	resp, err := client.Do(req)

@@ -26,7 +26,7 @@ func NewHTTPClient() *http.Client {
 	return &http.Client{Timeout: HTTPClientTimeout}
 }
 
-func SetDefaultHTTPHeaders(req *http.Request) {
+func setDefaultHTTPHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", HTTPUserAgent)
 }
 
@@ -71,7 +71,7 @@ func moduleProxyBaseURL(explicit string) string {
 	return "https://proxy.golang.org"
 }
 
-func NewGoProxy(configured string) *GoProxy {
+func newGoProxy(configured string) *GoProxy {
 	base := moduleProxyBaseURL(configured)
 	return &GoProxy{
 		baseURL: base,
@@ -99,7 +99,7 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
-	SetDefaultHTTPHeaders(req)
+	setDefaultHTTPHeaders(req)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -155,7 +155,7 @@ func (p *GoProxy) FetchVersionInfo(modPath, version string) (ModuleVersionInfo, 
 	if err != nil {
 		return info, fmt.Errorf("failed to build request: %w", err)
 	}
-	SetDefaultHTTPHeaders(req)
+	setDefaultHTTPHeaders(req)
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return info, fmt.Errorf("failed to fetch version info: %w", err)

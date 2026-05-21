@@ -140,7 +140,7 @@ func validateRequestedDependencies(original *modfile.File) error {
 
 func Process(original *modfile.File) []Result {
 	var results []Result
-	proxy := NewGoProxy(Config.ModuleProxy)
+	proxy := newGoProxy(Config.ModuleProxy)
 	okMod, err := ParseMod(goModFile)
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
@@ -219,7 +219,7 @@ func Process(original *modfile.File) []Result {
 		}
 
 		if upgradeSuccess && versionAfter != r.Mod.Version {
-			PrintConsoleUpdate(r.Mod.Path, versionAfter)
+			printConsoleUpdate(r.Mod.Path, versionAfter)
 		}
 
 		result := Result{
