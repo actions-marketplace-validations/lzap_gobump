@@ -7,7 +7,7 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-func parseMod(file string) (*modfile.File, error) {
+func ParseMod(file string) (*modfile.File, error) {
 	buf, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("error reading go.mod: %w", err)
@@ -21,7 +21,7 @@ func parseMod(file string) (*modfile.File, error) {
 	return mod, nil
 }
 
-func saveMod(file string, mod *modfile.File) error {
+func SaveMod(file string, mod *modfile.File) error {
 	buf, err := mod.Format()
 	if err != nil {
 		return fmt.Errorf("error formatting go.mod: %w", err)

@@ -9,36 +9,36 @@ import (
 	"strings"
 )
 
-func perDependencyGitEnabled() bool {
-	if config.NoGit || config.DryRun {
+func PerDependencyGitEnabled() bool {
+	if Config.NoGit || Config.DryRun {
 		return false
 	}
-	if !gitInsideWorkTree() {
+	if !GitInsideWorkTree() {
 		return false
 	}
-	if gitHasUncommittedChanges() {
+	if GitHasUncommittedChanges() {
 		return false
 	}
 	return true
 }
 
-// errIfUnsafeGitWorktree returns an error when the repository has local changes
+// ErrIfUnsafeGitWorktree returns an error when the repository has local changes
 // and gobump would use git, so the user can opt out explicitly with -no-git.
-func errIfUnsafeGitWorktree() error {
-	if config.NoGit || config.DryRun {
+func ErrIfUnsafeGitWorktree() error {
+	if Config.NoGit || Config.DryRun {
 		return nil
 	}
-	if !gitInsideWorkTree() {
+	if !GitInsideWorkTree() {
 		return nil
 	}
-	if !gitHasUncommittedChanges() {
+	if !GitHasUncommittedChanges() {
 		return nil
 	}
 	return fmt.Errorf("refusing to run: git work tree has uncommitted changes. Commit or stash your changes first, or pass -no-git to skip all git integration (no commits, reset, or clean)")
 }
 
-func gitHasUncommittedChanges() bool {
-	outBytes, err := gitOutput("status", "--porcelain")
+func GitHasUncommittedChanges() bool {
+	outBytes, err := GitOutput("status", "--porcelain")
 	if err != nil {
 		// If status fails inside a work tree, treat as unsafe.
 		return true
@@ -46,24 +46,24 @@ func gitHasUncommittedChanges() bool {
 	return strings.TrimSpace(string(outBytes)) != ""
 }
 
-func gitInsideWorkTree() bool {
-	outBytes, err := gitOutput("rev-parse", "--is-inside-work-tree")
+func GitInsideWorkTree() bool {
+	outBytes, err := GitOutput("rev-parse", "--is-inside-work-tree")
 	if err != nil {
 		return false
 	}
 	return strings.TrimSpace(string(outBytes)) == "true"
 }
 
-func gitRun(args ...string) error {
-	return runCmd("git", args, true)
+func GitRun(args ...string) error {
+	return RunCmd("git", args, true)
 }
 
-func gitOutput(args ...string) ([]byte, error) {
-	return runCmdOutput("git", args, true)
+func GitOutput(args ...string) ([]byte, error) {
+	return RunCmdOutput("git", args, true)
 }
 
-func goModSumPathsForGit() []string {
-	modPath := config.GoModDst
+func GoModSumPathsForGit() []string {
+	modPath := Config.GoModDst
 	sumPath := strings.TrimSuffix(modPath, ".mod") + ".sum"
 	paths := []string{modPath}
 	if st, err := os.Stat(sumPath); err == nil && !st.IsDir() {
@@ -72,10 +72,10 @@ func goModSumPathsForGit() []string {
 	return paths
 }
 
-func gitWorktreeDiffersFromHEAD() bool {
-	paths := goModSumPathsForGit()
+func GitWorktreeDiffersFromHEAD() bool {
+	paths := GoModSumPathsForGit()
 	args := append([]string{"diff", "--quiet", "HEAD", "--"}, paths...)
-	err := gitRun(args...)
+	err := GitRun(args...)
 	if err == nil {
 		return false
 	}
@@ -86,41 +86,41 @@ func gitWorktreeDiffersFromHEAD() bool {
 	return false
 }
 
-func gitResetHardHEAD() error {
-	if err := gitRun("reset", "--hard", "HEAD"); err != nil {
+func GitResetHardHEAD() error {
+	if err := GitRun("reset", "--hard", "HEAD"); err != nil {
 		return fmt.Errorf("git reset --hard HEAD: %w", err)
 	}
-	if err := gitRun("clean", "-fdq"); err != nil {
+	if err := GitRun("clean", "-fdq"); err != nil {
 		return fmt.Errorf("git clean -fdq: %w", err)
 	}
 	return nil
 }
 
-func gitEnsureUserIdentity() error {
-	if err := gitRun("config", "user.name", config.GitUserName); err != nil {
+func GitEnsureUserIdentity() error {
+	if err := GitRun("config", "user.name", Config.GitUserName); err != nil {
 		return fmt.Errorf("git config user.name: %w", err)
 	}
-	if err := gitRun("config", "user.email", config.GitUserEmail); err != nil {
+	if err := GitRun("config", "user.email", Config.GitUserEmail); err != nil {
 		return fmt.Errorf("git config user.email: %w", err)
 	}
 	return nil
 }
 
-func goModTidy() error {
-	if err := cmd(config.GoBinary, "mod", "tidy"); err != nil {
+func GoModTidy() error {
+	if err := Cmd(Config.GoBinary, "mod", "tidy"); err != nil {
 		return fmt.Errorf("go mod tidy: %w", err)
 	}
 	return nil
 }
 
-func gitCommitDependencyBump(modulePath, versionBefore, versionAfter string) error {
-	if err := gitEnsureUserIdentity(); err != nil {
+func GitCommitDependencyBump(modulePath, versionBefore, versionAfter string) error {
+	if err := GitEnsureUserIdentity(); err != nil {
 		return err
 	}
-	if err := goModTidy(); err != nil {
+	if err := GoModTidy(); err != nil {
 		return err
 	}
-	paths := goModSumPathsForGit()
+	paths := GoModSumPathsForGit()
 	for _, p := range paths {
 		if _, err := os.Stat(p); err != nil {
 			return fmt.Errorf("git add: %w", err)
@@ -134,7 +134,7 @@ func gitCommitDependencyBump(modulePath, versionBefore, versionAfter string) err
 		}
 		absPaths = append(absPaths, abs)
 	}
-	topBytes, err := gitOutput("rev-parse", "--show-toplevel")
+	topBytes, err := GitOutput("rev-parse", "--show-toplevel")
 	if err != nil {
 		return fmt.Errorf("git rev-parse --show-toplevel: %w", err)
 	}
@@ -151,14 +151,14 @@ func gitCommitDependencyBump(modulePath, versionBefore, versionAfter string) err
 		relPaths[i] = filepath.ToSlash(rel)
 	}
 	addArgs := append([]string{"add", "--"}, relPaths...)
-	if err := gitRun(addArgs...); err != nil {
+	if err := GitRun(addArgs...); err != nil {
 		return fmt.Errorf("git add: %w", err)
 	}
 	msg := fmt.Sprintf("chore(deps): update %s to %s", modulePath, versionAfter)
-	if config.Changelog {
-		msg += formatModuleChangelog(modulePath, versionBefore, versionAfter)
+	if Config.Changelog {
+		msg += FormatModuleChangelog(modulePath, versionBefore, versionAfter)
 	}
-	if err := gitRun("commit", "-m", msg); err != nil {
+	if err := GitRun("commit", "-m", msg); err != nil {
 		return fmt.Errorf("git commit: %w", err)
 	}
 	return nil

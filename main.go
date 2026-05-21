@@ -9,7 +9,7 @@ import (
 func main() {
 	InitConfig()
 
-	if config.Version {
+	if Config.Version {
 		if info, ok := debug.ReadBuildInfo(); ok {
 			fmt.Printf("%s %s\n", info.Main.Version, info.Main.Sum)
 			os.Exit(0)
@@ -20,35 +20,35 @@ func main() {
 
 	InitLoggers()
 
-	if err := errIfUnsafeGitWorktree(); err != nil {
-		fatal(err.Error(), ERR_GIT)
+	if err := ErrIfUnsafeGitWorktree(); err != nil {
+		Fatal(err.Error(), ERR_GIT)
 	}
 
-	if config.Format == "markdown" {
-		printMarkdownHeader()
-		defer printMarkdownFooter()
+	if Config.Format == "markdown" {
+		PrintMarkdownHeader()
+		defer PrintMarkdownFooter()
 	}
 
-	original, err := parseMod(config.GoModSrc)
+	original, err := ParseMod(Config.GoModSrc)
 	if err != nil {
-		fatal(err.Error(), ERR_PARSE)
+		Fatal(err.Error(), ERR_PARSE)
 	}
 
 	defer func() {
-		if config.DryRun {
-			if err := saveMod(config.GoModDst, original); err != nil {
-				fatal(err.Error(), ERR_WRITE)
+		if Config.DryRun {
+			if err := SaveMod(Config.GoModDst, original); err != nil {
+				Fatal(err.Error(), ERR_WRITE)
 			}
 		}
 	}()
 
-	results := process(original)
+	results := Process(original)
 
-	printResults(results)
-	if config.Changelog && !perDependencyGitEnabled() {
+	PrintResults(results)
+	if Config.Changelog && !PerDependencyGitEnabled() {
 		PrintChangelogs(results)
 	}
-	if config.FailOnError && resultsHaveErrors(results) {
+	if Config.FailOnError && ResultsHaveErrors(results) {
 		os.Exit(1)
 	}
 }

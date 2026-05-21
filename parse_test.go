@@ -16,9 +16,9 @@ func TestParseModAndSaveModRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mod, err := parseMod(path)
+	mod, err := ParseMod(path)
 	if err != nil {
-		t.Fatalf("parseMod: %v", err)
+		t.Fatalf("ParseMod: %v", err)
 	}
 	if mod == nil || mod.Module == nil {
 		t.Fatal("expected parsed module")
@@ -27,12 +27,12 @@ func TestParseModAndSaveModRoundTrip(t *testing.T) {
 		t.Errorf("module path = %q", mod.Module.Mod.Path)
 	}
 
-	if err := saveMod(path, mod); err != nil {
-		t.Fatalf("saveMod: %v", err)
+	if err := SaveMod(path, mod); err != nil {
+		t.Fatalf("SaveMod: %v", err)
 	}
-	mod2, err := parseMod(path)
+	mod2, err := ParseMod(path)
 	if err != nil {
-		t.Fatalf("parseMod second: %v", err)
+		t.Fatalf("ParseMod second: %v", err)
 	}
 	if diff := cmp.Diff(mod.Module.Mod.Path, mod2.Module.Mod.Path); diff != "" {
 		t.Errorf("round trip module path (-want +got):\n%s", diff)

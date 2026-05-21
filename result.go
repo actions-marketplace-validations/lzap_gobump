@@ -9,9 +9,9 @@ type Result struct {
 	NoProxyVersions bool // proxy returned no semver newer than current (no go get attempted)
 }
 
-// resultsHaveErrors reports whether any module that was considered for update
+// ResultsHaveErrors reports whether any module that was considered for update
 // ended in a failed state (excluded modules are ignored).
-func resultsHaveErrors(results []Result) bool {
+func ResultsHaveErrors(results []Result) bool {
 	for _, r := range results {
 		if r.Excluded {
 			continue

@@ -23,14 +23,14 @@ var (
 	ColorInvert    = "\033[7m"
 )
 
-func color(input string, color ...string) string {
+func Color(input string, codes ...string) string {
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		return input
 	}
 
 	c := ""
-	for i := range color {
-		c = c + color[i]
+	for i := range codes {
+		c = c + codes[i]
 	}
 	return c + input + ColorReset
 }

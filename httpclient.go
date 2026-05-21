@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	httpUserAgent = "gobump (https://github.com/lzap/gobump)"
-	// httpClientTimeout bounds how long outbound HTTP (module proxy, GitHub API) may block.
-	httpClientTimeout = 90 * time.Second
+	HTTPUserAgent = "gobump (https://github.com/lzap/gobump)"
+	// HTTPClientTimeout bounds how long outbound HTTP (module proxy, GitHub API) may block.
+	HTTPClientTimeout = 90 * time.Second
 )
 
-func newHTTPClient() *http.Client {
-	return &http.Client{Timeout: httpClientTimeout}
+func NewHTTPClient() *http.Client {
+	return &http.Client{Timeout: HTTPClientTimeout}
 }
 
-func setDefaultHTTPHeaders(req *http.Request) {
-	req.Header.Set("User-Agent", httpUserAgent)
+func SetDefaultHTTPHeaders(req *http.Request) {
+	req.Header.Set("User-Agent", HTTPUserAgent)
 }

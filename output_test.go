@@ -12,7 +12,7 @@ import (
 
 func withLoggers(t *testing.T, stdout, stderr io.Writer, verbose bool, format string) {
 	t.Helper()
-	config = &AppConfig{Verbose: verbose, Format: format}
+	Config = &AppConfig{Verbose: verbose, Format: format}
 	InitLoggers()
 	if stdout != nil {
 		Out = log.New(stdout, "", 0)
@@ -29,7 +29,7 @@ func TestPrintMarkdownResults(t *testing.T) {
 	var buf bytes.Buffer
 	withLoggers(t, &buf, nil, false, "markdown")
 
-	printMarkdownResults([]Result{
+	PrintMarkdownResults([]Result{
 		{
 			ModulePath:    "example.com/mod",
 			Success:       true,
@@ -59,8 +59,8 @@ func TestPrintMarkdownMinimalStdout(t *testing.T) {
 	var buf bytes.Buffer
 	withLoggers(t, &buf, nil, false, "markdown")
 
-	printMarkdownHeader()
-	printMarkdownResults([]Result{
+	PrintMarkdownHeader()
+	PrintMarkdownResults([]Result{
 		{
 			ModulePath:    "example.com/mod",
 			Success:       true,
@@ -68,7 +68,7 @@ func TestPrintMarkdownMinimalStdout(t *testing.T) {
 			VersionAfter:  "v2.0.0",
 		},
 	})
-	printMarkdownFooter()
+	PrintMarkdownFooter()
 
 	expected := `## Pinned Go version dependency update
 | Module | Status | Version |
@@ -87,7 +87,7 @@ func TestPrintConsoleResults(t *testing.T) {
 	var buf bytes.Buffer
 	withLoggers(t, &buf, nil, false, "console")
 
-	printConsoleResults([]Result{
+	PrintConsoleResults([]Result{
 		{
 			ModulePath:    "example.com/mod",
 			Success:       true,

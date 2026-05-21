@@ -17,19 +17,19 @@ const (
 	ERR_GIT   = 6
 )
 
-// cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via Debug.
-func cmd(name string, args ...string) error {
-	return runCmd(name, args, true)
+// Cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via Debug.
+func Cmd(name string, args ...string) error {
+	return RunCmd(name, args, true)
 }
 
-func cmdline(name string, args []string) string {
+func Cmdline(name string, args []string) string {
 	if len(args) == 0 {
 		return name
 	}
 	return name + " " + strings.Join(args, " ")
 }
 
-func logCmdResult(cmdline string, stdout, stderr *bytes.Buffer, err error) {
+func LogCmdResult(Cmdline string, stdout, stderr *bytes.Buffer, err error) {
 	exitCode := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -51,32 +51,32 @@ func logCmdResult(cmdline string, stdout, stderr *bytes.Buffer, err error) {
 	}
 }
 
-func runCmd(name string, args []string, logOutput bool) error {
-	line := cmdline(name, args)
-	if logOutput && debugEnabled() {
+func RunCmd(name string, args []string, logOutput bool) error {
+	line := Cmdline(name, args)
+	if logOutput && DebugEnabled() {
 		Debug.Println("running:", line)
 	}
 	c := exec.Command(name, args...)
 	c.Env = os.Environ()
 	var stdout, stderr bytes.Buffer
-	if logOutput && debugEnabled() {
+	if logOutput && DebugEnabled() {
 		c.Stdout = &stdout
 		c.Stderr = &stderr
 	}
 	err := c.Run()
-	if logOutput && debugEnabled() {
-		logCmdResult(line, &stdout, &stderr, err)
+	if logOutput && DebugEnabled() {
+		LogCmdResult(line, &stdout, &stderr, err)
 	}
 	return err
 }
 
-func runCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
-	if !logOutput || !debugEnabled() {
+func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
+	if !logOutput || !DebugEnabled() {
 		c := exec.Command(name, args...)
 		c.Env = os.Environ()
 		return c.Output()
 	}
-	line := cmdline(name, args)
+	line := Cmdline(name, args)
 	Debug.Println("running:", line)
 	c := exec.Command(name, args...)
 	c.Env = os.Environ()
@@ -84,23 +84,23 @@ func runCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 	c.Stdout = &stdout
 	c.Stderr = &stderr
 	err := c.Run()
-	logCmdResult(line, &stdout, &stderr, err)
+	LogCmdResult(line, &stdout, &stderr, err)
 	return stdout.Bytes(), err
 }
 
 var ErrCmd = fmt.Errorf("command error")
 
-func cmds(str string) error {
+func Cmds(str string) error {
 	parts := strings.Fields(str)
 	if len(parts) == 0 {
 		return fmt.Errorf("%w: no command", ErrCmd)
 	}
 
 	if len(parts) == 1 {
-		return cmd(parts[0])
+		return Cmd(parts[0])
 	}
 
 	p1 := parts[0]
 	p2 := parts[1:]
-	return cmd(p1, p2...)
+	return Cmd(p1, p2...)
 }

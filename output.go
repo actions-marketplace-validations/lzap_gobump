@@ -15,57 +15,57 @@ var (
 
 func InitLoggers() {
 	Err = log.New(os.Stderr, "", 0)
-	if debugEnabled() {
+	if DebugEnabled() {
 		Debug = Err
 	} else {
 		Debug = log.New(io.Discard, "", 0)
 	}
 
 	outWriter := io.Writer(os.Stdout)
-	if config.Format == "none" {
+	if Config.Format == "none" {
 		outWriter = io.Discard
 	}
 	Out = log.New(outWriter, "", 0)
 }
 
-func fatal(msg string, code int) {
+func Fatal(msg string, code int) {
 	Err.Println(msg)
 	os.Exit(code)
 }
 
-func debugEnabled() bool {
-	return config != nil && config.Verbose
+func DebugEnabled() bool {
+	return Config != nil && Config.Verbose
 }
 
-func strOrDash(str string) string {
+func StrOrDash(str string) string {
 	if str == "" {
 		return "-"
 	}
 	return str
 }
 
-func printResults(results []Result) {
-	switch config.Format {
+func PrintResults(results []Result) {
+	switch Config.Format {
 	case "markdown":
-		printMarkdownResults(results)
+		PrintMarkdownResults(results)
 	case "console":
-		printConsoleResults(results)
+		PrintConsoleResults(results)
 	}
 }
 
-func printMarkdownHeader() {
+func PrintMarkdownHeader() {
 	Out.Println("## Pinned Go version dependency update")
 }
 
-func printMarkdownFooter() {
+func PrintMarkdownFooter() {
 	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", BuildID())
 }
 
-func markdownTableRow(cells ...string) string {
+func MarkdownTableRow(cells ...string) string {
 	return "| " + strings.Join(cells, " | ") + " |"
 }
 
-func markdownStatus(r Result) string {
+func MarkdownStatus(r Result) string {
 	if r.Excluded {
 		return "X"
 	}
@@ -81,20 +81,20 @@ func markdownStatus(r Result) string {
 	return "E"
 }
 
-func printMarkdownResults(results []Result) {
+func PrintMarkdownResults(results []Result) {
 	Out.Println("| Module | Status | Version |")
 	Out.Println("| --- | --- | --- |")
 	for _, r := range results {
-		Out.Println(markdownTableRow(
+		Out.Println(MarkdownTableRow(
 			r.ModulePath,
-			markdownStatus(r),
-			strOrDash(r.VersionBefore)+" > "+strOrDash(r.VersionAfter),
+			MarkdownStatus(r),
+			StrOrDash(r.VersionBefore)+" > "+StrOrDash(r.VersionAfter),
 		))
 	}
 	Out.Println("Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.")
 }
 
-func consoleStatus(r Result) string {
+func ConsoleStatus(r Result) string {
 	if r.Excluded {
 		return "excluded"
 	}
@@ -110,17 +110,17 @@ func consoleStatus(r Result) string {
 	return "err"
 }
 
-func printConsoleUpdate(path, version string) {
-	if config.Format != "console" {
+func PrintConsoleUpdate(path, version string) {
+	if Config.Format != "console" {
 		return
 	}
 	Out.Printf("go get %s@%s\n", path, version)
 }
 
-func printConsoleResults(results []Result) {
-	Out.Println(color("summary:", ColorBold))
+func PrintConsoleResults(results []Result) {
+	Out.Println(Color("summary:", ColorBold))
 	for _, r := range results {
-		action := consoleStatus(r)
+		action := ConsoleStatus(r)
 		if r.VersionAfter != "" && r.VersionAfter != r.VersionBefore {
 			Out.Println(r.ModulePath, action, r.VersionBefore, "->", r.VersionAfter)
 		} else {

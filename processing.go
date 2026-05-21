@@ -8,17 +8,17 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-// attemptUpgrade tries to upgrade a module to a specific version.
-func attemptUpgrade(modulePath, version string) (*modfile.File, error) {
-	err := cmd(config.GoBinary, "get", modulePath+"@"+version)
+// AttemptUpgrade tries to upgrade a module to a specific version.
+func AttemptUpgrade(modulePath, version string) (*modfile.File, error) {
+	err := Cmd(Config.GoBinary, "get", modulePath+"@"+version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get module: %w", err)
 	}
-	return parseMod(config.GoModSrc)
+	return ParseMod(Config.GoModSrc)
 }
 
-// validateUpgrade checks if the upgrade is valid.
-func validateUpgrade(originalMod, newMod *modfile.File) error {
+// ValidateUpgrade checks if the upgrade is valid.
+func ValidateUpgrade(originalMod, newMod *modfile.File) error {
 	if newMod == nil || newMod.Go == nil {
 		return fmt.Errorf("parsing error")
 	}
@@ -28,9 +28,9 @@ func validateUpgrade(originalMod, newMod *modfile.File) error {
 	return nil
 }
 
-// upgradeModule attempts to upgrade a single module.
+// UpgradeModule attempts to upgrade a single module.
 // The bool is success; the third return is true when the proxy listed no newer versions (no go get run).
-func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*modfile.File, bool, bool) {
+func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*modfile.File, bool, bool) {
 	var success bool
 	var noProxyVersions bool
 	Debug.Println("bump module", r.Mod.Path, "from", r.Mod.Version)
@@ -48,24 +48,24 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 	}
 
 	for vi, version := range versions {
-		if vi >= config.Retries {
+		if vi >= Config.Retries {
 			Debug.Println("too many failed attempts, giving up")
 			break
 		}
 
-		Debug.Println("attempt", vi+1, "of", min(config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
-		newMod, err := attemptUpgrade(r.Mod.Path, version.Version)
+		Debug.Println("attempt", vi+1, "of", min(Config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
+		newMod, err := AttemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
 			Debug.Println("upgrade unsuccessful, reverting go.mod")
-			if err := saveMod(config.GoModDst, okMod); err != nil {
+			if err := SaveMod(Config.GoModDst, okMod); err != nil {
 				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			continue
 		}
 
-		if err := validateUpgrade(okMod, newMod); err != nil {
+		if err := ValidateUpgrade(okMod, newMod); err != nil {
 			Debug.Printf("%s; reverting go.mod\n", err.Error())
-			if err := saveMod(config.GoModDst, okMod); err != nil {
+			if err := SaveMod(Config.GoModDst, okMod); err != nil {
 				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			continue
@@ -73,7 +73,7 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 		Debug.Println("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
-		if !runCommands(okMod) {
+		if !RunCommands(okMod) {
 			continue
 		}
 
@@ -83,17 +83,17 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 	return okMod, success, false
 }
 
-// runCommands executes post-upgrade commands against the current go.mod on disk
+// RunCommands executes post-upgrade commands against the current go.mod on disk
 // (expected to match a successful upgrade). On failure it restores revertTo.
-func runCommands(revertTo *modfile.File) bool {
-	for _, c := range config.Commands {
+func RunCommands(revertTo *modfile.File) bool {
+	for _, c := range Config.Commands {
 		if c == "" {
 			continue
 		}
 		Debug.Println("running -exec:", c)
-		if err := cmds(c); err != nil {
+		if err := Cmds(c); err != nil {
 			Debug.Println("exec failed, reverting go.mod")
-			if err := saveMod(config.GoModDst, revertTo); err != nil {
+			if err := SaveMod(Config.GoModDst, revertTo); err != nil {
 				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			return false
@@ -103,21 +103,21 @@ func runCommands(revertTo *modfile.File) bool {
 	return true
 }
 
-func process(original *modfile.File) []Result {
+func Process(original *modfile.File) []Result {
 	var results []Result
-	proxy := NewGoProxy(config.ModuleProxy)
-	okMod, err := parseMod(config.GoModSrc)
+	proxy := NewGoProxy(Config.ModuleProxy)
+	okMod, err := ParseMod(Config.GoModSrc)
 	if err != nil {
-		fatal(err.Error(), ERR_PARSE)
+		Fatal(err.Error(), ERR_PARSE)
 	}
 
-	perDepGit := perDependencyGitEnabled()
+	perDepGit := PerDependencyGitEnabled()
 
 	dependencies := original.Require
-	if len(config.Dependencies) > 0 {
+	if len(Config.Dependencies) > 0 {
 		dependencies = []*modfile.Require{}
 		for _, r := range original.Require {
-			for _, d := range config.Dependencies {
+			for _, d := range Config.Dependencies {
 				if r.Mod.Path == d {
 					dependencies = append(dependencies, r)
 				}
@@ -131,7 +131,7 @@ func process(original *modfile.File) []Result {
 		}
 
 		excluded := false
-		if slices.Contains(config.Exclude, r.Mod.Path) {
+		if slices.Contains(Config.Exclude, r.Mod.Path) {
 			results = append(results, Result{
 				ModulePath:    r.Mod.Path,
 				VersionBefore: r.Mod.Version,
@@ -145,7 +145,7 @@ func process(original *modfile.File) []Result {
 			continue
 		}
 
-		newMod, upgradeSuccess, noProxyVersions := upgradeModule(proxy, r, okMod)
+		newMod, upgradeSuccess, noProxyVersions := UpgradeModule(proxy, r, okMod)
 
 		versionAfter := r.Mod.Version
 		if newMod != nil {
@@ -160,19 +160,19 @@ func process(original *modfile.File) []Result {
 		if perDepGit {
 			if !upgradeSuccess {
 				Debug.Println("git reset/clean after failed bump for", r.Mod.Path)
-				if err := gitResetHardHEAD(); err != nil {
+				if err := GitResetHardHEAD(); err != nil {
 					Err.Println("git reset/clean failed:", err.Error())
 				}
-			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
+			} else if versionAfter != r.Mod.Version && GitWorktreeDiffersFromHEAD() {
 				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
-				if err := gitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
+				if err := GitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
 					Err.Println("git commit failed:", err.Error())
 				}
 			}
 		}
 
 		if upgradeSuccess && versionAfter != r.Mod.Version {
-			printConsoleUpdate(r.Mod.Path, versionAfter)
+			PrintConsoleUpdate(r.Mod.Path, versionAfter)
 		}
 
 		result := Result{

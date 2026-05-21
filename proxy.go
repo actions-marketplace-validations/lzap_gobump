@@ -15,19 +15,19 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// moduleVersionOrigin is the VCS origin recorded by the module proxy for a release.
-type moduleVersionOrigin struct {
+// ModuleVersionOrigin is the VCS origin recorded by the module proxy for a release.
+type ModuleVersionOrigin struct {
 	VCS  string `json:"VCS"`
 	URL  string `json:"URL"`
 	Hash string `json:"Hash"`
 	Ref  string `json:"Ref"`
 }
 
-// moduleVersionInfo is the JSON body of a module proxy @v/VERSION.info response.
-type moduleVersionInfo struct {
+// ModuleVersionInfo is the JSON body of a module proxy @v/VERSION.info response.
+type ModuleVersionInfo struct {
 	Version string              `json:"Version"`
 	Time    string              `json:"Time"`
-	Origin  moduleVersionOrigin `json:"Origin"`
+	Origin  ModuleVersionOrigin `json:"Origin"`
 }
 
 type GoProxy struct {
@@ -63,11 +63,11 @@ func NewGoProxy(configured string) *GoProxy {
 	base := ModuleProxyBaseURL(configured)
 	return &GoProxy{
 		baseURL: base,
-		client:  newHTTPClient(),
+		client:  NewHTTPClient(),
 	}
 }
 
-func isPreRelease(version string) bool {
+func IsPreRelease(version string) bool {
 	return strings.Contains(version, "-")
 }
 
@@ -87,7 +87,7 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
-	setDefaultHTTPHeaders(req)
+	SetDefaultHTTPHeaders(req)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -104,7 +104,7 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 		line := scanner.Text()
 
 		// skip pre-release versions
-		if !isPreRelease(version) && isPreRelease(line) {
+		if !IsPreRelease(version) && IsPreRelease(line) {
 			continue
 		}
 
@@ -132,8 +132,8 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 }
 
 // FetchVersionInfo returns proxy metadata for a single module version.
-func (p *GoProxy) FetchVersionInfo(modPath, version string) (moduleVersionInfo, error) {
-	var info moduleVersionInfo
+func (p *GoProxy) FetchVersionInfo(modPath, version string) (ModuleVersionInfo, error) {
+	var info ModuleVersionInfo
 	escaped, err := module.EscapePath(modPath)
 	if err != nil {
 		return info, fmt.Errorf("failed to escape module path: %w", err)
@@ -143,7 +143,7 @@ func (p *GoProxy) FetchVersionInfo(modPath, version string) (moduleVersionInfo, 
 	if err != nil {
 		return info, fmt.Errorf("failed to build request: %w", err)
 	}
-	setDefaultHTTPHeaders(req)
+	SetDefaultHTTPHeaders(req)
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return info, fmt.Errorf("failed to fetch version info: %w", err)
@@ -158,8 +158,8 @@ func (p *GoProxy) FetchVersionInfo(modPath, version string) (moduleVersionInfo, 
 	return info, nil
 }
 
-// discardBody drains and closes a response body when the caller does not need it.
-func discardBody(resp *http.Response) {
+// DiscardBody drains and closes a response body when the caller does not need it.
+func DiscardBody(resp *http.Response) {
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 }
