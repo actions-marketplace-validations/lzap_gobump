@@ -193,7 +193,7 @@ func CreateGist(token, description, content string) (string, error) {
 		return "", fmt.Errorf("failed to create Gist request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "token "+token)
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	SetDefaultHTTPHeaders(req)
 
