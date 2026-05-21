@@ -64,7 +64,7 @@ func Fatal(msg string, code int) {
 	os.Exit(code)
 }
 
-func StrOrDash(str string) string {
+func strOrDash(str string) string {
 	if str == "" {
 		return "-"
 	}
@@ -85,14 +85,14 @@ func PrintMarkdownHeader() {
 }
 
 func PrintMarkdownFooter() {
-	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", BuildID())
+	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", buildID())
 }
 
-func MarkdownTableRow(cells ...string) string {
+func markdownTableRow(cells ...string) string {
 	return "| " + strings.Join(cells, " | ") + " |"
 }
 
-func MarkdownStatus(r Result) string {
+func markdownStatus(r Result) string {
 	if r.Excluded {
 		return "X"
 	}
@@ -112,16 +112,16 @@ func PrintMarkdownResults(results []Result) {
 	Out.Println("| Module | Status | Version |")
 	Out.Println("| --- | --- | --- |")
 	for _, r := range results {
-		Out.Println(MarkdownTableRow(
+		Out.Println(markdownTableRow(
 			r.ModulePath,
-			MarkdownStatus(r),
-			StrOrDash(r.VersionBefore)+" > "+StrOrDash(r.VersionAfter),
+			markdownStatus(r),
+			strOrDash(r.VersionBefore)+" > "+strOrDash(r.VersionAfter),
 		))
 	}
 	Out.Println("Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.")
 }
 
-func ConsoleStatus(r Result) string {
+func consoleStatus(r Result) string {
 	if r.Excluded {
 		return "excluded"
 	}
@@ -147,7 +147,7 @@ func PrintConsoleUpdate(path, version string) {
 func PrintConsoleResults(results []Result) {
 	Out.Println("summary:")
 	for _, r := range results {
-		action := ConsoleStatus(r)
+		action := consoleStatus(r)
 		if r.VersionAfter != "" && r.VersionAfter != r.VersionBefore {
 			Out.Println(r.ModulePath, action, r.VersionBefore, "->", r.VersionAfter)
 		} else {

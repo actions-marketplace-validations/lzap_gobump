@@ -10,17 +10,14 @@ import (
 	"strings"
 )
 
-// GitHubToken returns a token for GitHub API calls (changelog compare, gist).
-// GH_TOKEN is set by the GitHub CLI and many CI setups; GITHUB_TOKEN is the Actions default.
-func GitHubToken() string {
+func githubToken() string {
 	if t := os.Getenv("GITHUB_TOKEN"); t != "" {
 		return t
 	}
 	return os.Getenv("GH_TOKEN")
 }
 
-// GitHubCommit represents a single commit in the GitHub API response.
-type GitHubCommit struct {
+type githubCommit struct {
 	SHA    string `json:"sha"`
 	Commit struct {
 		Message string `json:"message"`
@@ -30,37 +27,32 @@ type GitHubCommit struct {
 	} `json:"commit"`
 }
 
-// GitHubCompareResponse represents the response from the GitHub compare API.
-type GitHubCompareResponse struct {
-	Commits []GitHubCommit `json:"commits"`
+type githubCompareResponse struct {
+	Commits []githubCommit `json:"commits"`
 }
 
-// GistFile represents a file in a Gist.
-type GistFile struct {
+type gistFile struct {
 	Content string `json:"content"`
 }
 
-// GistRequest represents the request to create a Gist.
-type GistRequest struct {
+type gistRequest struct {
 	Description string              `json:"description"`
 	Public      bool                `json:"public"`
-	Files       map[string]GistFile `json:"files"`
+	Files       map[string]gistFile `json:"files"`
 }
 
-// GistResponse represents the response from creating a Gist.
-type GistResponse struct {
+type gistResponse struct {
 	HTMLURL string `json:"html_url"`
 }
 
-func ShortCommitSHA(sha string) string {
+func shortCommitSHA(sha string) string {
 	if len(sha) <= 7 {
 		return sha
 	}
 	return sha[:7]
 }
 
-// GitHubRepoFromOriginURL maps a module VCS origin URL to a GitHub owner/repo for compare API calls.
-func GitHubRepoFromOriginURL(originURL string) (owner, repo string, ok bool) {
+func githubRepoFromOriginURL(originURL string) (owner, repo string, ok bool) {
 	originURL = strings.TrimSuffix(strings.TrimSpace(originURL), "/")
 	switch {
 	case strings.HasPrefix(originURL, "https://github.com/"):
@@ -84,24 +76,24 @@ func GitHubRepoFromOriginURL(originURL string) (owner, repo string, ok bool) {
 	return "", "", false
 }
 
-func FormatGitHubCompareCommits(commits []GitHubCommit) string {
+func formatGitHubCompareCommits(commits []githubCommit) string {
 	var changelog strings.Builder
 	for _, commit := range commits {
 		firstLine := strings.Split(commit.Commit.Message, "\n")[0]
-		changelog.WriteString(fmt.Sprintf("* %s: %s (%s)\n", ShortCommitSHA(commit.SHA), firstLine, commit.Commit.Author.Name))
+		changelog.WriteString(fmt.Sprintf("* %s: %s (%s)\n", shortCommitSHA(commit.SHA), firstLine, commit.Commit.Author.Name))
 	}
 	return changelog.String()
 }
 
-func FetchGitHubCompare(owner, repo, compareRange string) (GitHubCompareResponse, int, error) {
-	var compareResp GitHubCompareResponse
+func fetchGitHubCompare(owner, repo, compareRange string) (githubCompareResponse, int, error) {
+	var compareResp githubCompareResponse
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/compare/%s", owner, repo, compareRange)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
 	if err != nil {
 		return compareResp, 0, fmt.Errorf("failed to build GitHub request: %w", err)
 	}
 	SetDefaultHTTPHeaders(req)
-	if tok := GitHubToken(); tok != "" {
+	if tok := githubToken(); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	resp, err := NewHTTPClient().Do(req)
@@ -110,7 +102,7 @@ func FetchGitHubCompare(owner, repo, compareRange string) (GitHubCompareResponse
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		DiscardBody(resp)
+		discardBody(resp)
 		return compareResp, resp.StatusCode, nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&compareResp); err != nil {
@@ -130,22 +122,22 @@ func GetChangelog(modulePath, fromVersion, toVersion string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	owner, repo, ok := GitHubRepoFromOriginURL(toInfo.Origin.URL)
+	owner, repo, ok := githubRepoFromOriginURL(toInfo.Origin.URL)
 	if !ok {
-		owner, repo, ok = GitHubRepoFromOriginURL(fromInfo.Origin.URL)
+		owner, repo, ok = githubRepoFromOriginURL(fromInfo.Origin.URL)
 	}
 	if !ok {
 		return "", nil
 	}
 
 	compareRange := fromVersion + "..." + toVersion
-	compareResp, status, err := FetchGitHubCompare(owner, repo, compareRange)
+	compareResp, status, err := fetchGitHubCompare(owner, repo, compareRange)
 	if err != nil {
 		return "", err
 	}
 	if status != http.StatusOK && fromInfo.Origin.Hash != "" && toInfo.Origin.Hash != "" {
 		compareRange = fromInfo.Origin.Hash + "..." + toInfo.Origin.Hash
-		compareResp, status, err = FetchGitHubCompare(owner, repo, compareRange)
+		compareResp, status, err = fetchGitHubCompare(owner, repo, compareRange)
 		if err != nil {
 			return "", err
 		}
@@ -153,11 +145,10 @@ func GetChangelog(modulePath, fromVersion, toVersion string) (string, error) {
 	if status != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned non-200 status: %d", status)
 	}
-	return FormatGitHubCompareCommits(compareResp.Commits), nil
+	return formatGitHubCompareCommits(compareResp.Commits), nil
 }
 
-// FormatModuleChangelog returns a changelog section for one module bump.
-func FormatModuleChangelog(modulePath, versionBefore, versionAfter string) string {
+func formatModuleChangelog(modulePath, versionBefore, versionAfter string) string {
 	var sb strings.Builder
 	sb.WriteString("\n\nCHANGELOG:\n")
 	changelog, err := GetChangelog(modulePath, versionBefore, versionAfter)
@@ -171,12 +162,11 @@ func FormatModuleChangelog(modulePath, versionBefore, versionAfter string) strin
 	return sb.String()
 }
 
-// CreateGist creates a new GitHub Gist with the provided content.
-func CreateGist(token, description, content string) (string, error) {
-	gistRequest := GistRequest{
+func createGist(token, description, content string) (string, error) {
+	gistRequest := gistRequest{
 		Description: description,
 		Public:      false,
-		Files: map[string]GistFile{
+		Files: map[string]gistFile{
 			"changelog.md": {
 				Content: content,
 			},
@@ -208,12 +198,12 @@ func CreateGist(token, description, content string) (string, error) {
 		return "", fmt.Errorf("GitHub API returned non-201 status for Gist creation: %s", resp.Status)
 	}
 
-	var gistResponse GistResponse
-	if err := json.NewDecoder(resp.Body).Decode(&gistResponse); err != nil {
+	var respBody gistResponse
+	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		return "", fmt.Errorf("failed to decode Gist response: %w", err)
 	}
 
-	return gistResponse.HTMLURL, nil
+	return respBody.HTMLURL, nil
 }
 
 // PrintChangelogs prints the changelogs for all updated modules.
@@ -236,12 +226,12 @@ func PrintChangelogs(results []Result) {
 				}
 			}
 		}
-		token := GitHubToken()
+		token := githubToken()
 		if token == "" {
 			Err.Println("Failed to create Gist: no GITHUB_TOKEN or GH_TOKEN set")
 			return
 		}
-		gistURL, err := CreateGist(token, "GoBump Dependency Changelog", fullChangelog.String())
+		gistURL, err := createGist(token, "GoBump Dependency Changelog", fullChangelog.String())
 		if err != nil {
 			Err.Println("Failed to create Gist:", err.Error())
 		} else {
@@ -251,7 +241,7 @@ func PrintChangelogs(results []Result) {
 		sb := strings.Builder{}
 		for _, result := range results {
 			if result.Success && result.VersionBefore != result.VersionAfter {
-				sb.WriteString(FormatModuleChangelog(result.ModulePath, result.VersionBefore, result.VersionAfter))
+				sb.WriteString(formatModuleChangelog(result.ModulePath, result.VersionBefore, result.VersionAfter))
 			}
 		}
 

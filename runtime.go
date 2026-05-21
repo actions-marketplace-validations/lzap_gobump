@@ -30,13 +30,8 @@ func init() {
 	}
 }
 
-// BuildID returns the build ID, typically a git commit but can be overriden via a linker flag.
+// buildID returns the build ID, typically a git commit but can be overriden via a linker flag.
 // This is the short version, up to BuildCommitChars characters long.
-func BuildID() string {
+func buildID() string {
 	return BuildCommit
-}
-
-// BuildTime returns the build time, if available.
-func BuildTime() string {
-	return BuildTimestamp
 }

@@ -97,7 +97,7 @@ func TestGitEnsureUserIdentity(t *testing.T) {
 		GitUserName:  "Schutzbot",
 		GitUserEmail: "schutzbot@gmail.com",
 	}
-	if err := GitEnsureUserIdentity(); err != nil {
+	if err := gitEnsureUserIdentity(); err != nil {
 		t.Fatal(err)
 	}
 

@@ -10,4 +10,4 @@ const (
 	ERR_GIT   = 6
 )
 
-var ErrCmd = fmt.Errorf("command error")
+var errCmd = fmt.Errorf("command error")

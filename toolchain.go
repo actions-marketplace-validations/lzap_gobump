@@ -13,8 +13,7 @@ import (
 // bundledToolchain is GOTOOLCHAIN for go subprocesses (from Config.GoBinary's GOVERSION).
 var bundledToolchain string
 
-// InitBundledToolchain sets bundledToolchain from the invoked Go binary (go env GOVERSION).
-func InitBundledToolchain() error {
+func initBundledToolchain() error {
 	out, err := exec.Command(Config.GoBinary, "env", "GOVERSION").Output()
 	if err != nil {
 		return fmt.Errorf("%s env GOVERSION: %w", Config.GoBinary, err)
@@ -76,8 +75,7 @@ func toolchainLabel(mod *modfile.File) string {
 	return mod.Toolchain.Name
 }
 
-// WarnIgnoredGoModToolchain logs when go.mod contains a toolchain line that gobump does not use.
-func WarnIgnoredGoModToolchain(mod *modfile.File) {
+func warnIgnoredGoModToolchain(mod *modfile.File) {
 	if mod == nil || mod.Toolchain == nil || mod.Toolchain.Name == "" {
 		return
 	}

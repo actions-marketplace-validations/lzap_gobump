@@ -18,9 +18,9 @@ func TestGitHubRepoFromOriginURL(t *testing.T) {
 		{"https://example.com/foo", "", "", false},
 	}
 	for _, tt := range tests {
-		owner, repo, ok := GitHubRepoFromOriginURL(tt.url)
+		owner, repo, ok := githubRepoFromOriginURL(tt.url)
 		if ok != tt.wantOK || owner != tt.wantOwner || repo != tt.wantRepo {
-			t.Errorf("GitHubRepoFromOriginURL(%q) = (%q, %q, %v), want (%q, %q, %v)",
+			t.Errorf("githubRepoFromOriginURL(%q) = (%q, %q, %v), want (%q, %q, %v)",
 				tt.url, owner, repo, ok, tt.wantOwner, tt.wantRepo, tt.wantOK)
 		}
 	}
@@ -53,8 +53,8 @@ func TestShortCommitSHA(t *testing.T) {
 		{"abcdefgh", "abcdefg"},
 	}
 	for _, tt := range tests {
-		if got := ShortCommitSHA(tt.in); got != tt.want {
-			t.Errorf("ShortCommitSHA(%q) = %q, want %q", tt.in, got, tt.want)
+		if got := shortCommitSHA(tt.in); got != tt.want {
+			t.Errorf("shortCommitSHA(%q) = %q, want %q", tt.in, got, tt.want)
 		}
 	}
 }

@@ -57,7 +57,7 @@ func TestSetEnvVarReplacesGOTOOLCHAIN(t *testing.T) {
 
 func TestInitBundledToolchain(t *testing.T) {
 	Config = &AppConfig{GoBinary: "go"}
-	if err := InitBundledToolchain(); err != nil {
+	if err := initBundledToolchain(); err != nil {
 		t.Skip("go not available:", err)
 	}
 	if !strings.HasPrefix(bundledToolchain, "go") {
@@ -67,7 +67,7 @@ func TestInitBundledToolchain(t *testing.T) {
 
 func TestWarnIgnoredGoModToolchainVerbose(t *testing.T) {
 	var stderr strings.Builder
-	WithLoggers(t, nil, &stderr, true, "none")
+	withLoggers(t, nil, &stderr, true, "none")
 	bundledToolchain = "go1.22.0"
 
 	mod, err := modfile.Parse("go.mod", []byte("module m\n\ngo 1.22\n\ntoolchain go1.99.0\n"), nil)
@@ -75,7 +75,7 @@ func TestWarnIgnoredGoModToolchainVerbose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	WarnIgnoredGoModToolchain(mod)
+	warnIgnoredGoModToolchain(mod)
 	if !strings.Contains(stderr.String(), "ignoring toolchain") {
 		t.Fatalf("expected warning on stderr, got: %q", stderr.String())
 	}

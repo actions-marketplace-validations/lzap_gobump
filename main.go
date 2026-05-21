@@ -20,7 +20,7 @@ func main() {
 
 	InitLoggers()
 
-	if err := InitBundledToolchain(); err != nil {
+	if err := initBundledToolchain(); err != nil {
 		Fatal(err.Error(), ERR_CMD)
 	}
 
@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
-	WarnIgnoredGoModToolchain(original)
+	warnIgnoredGoModToolchain(original)
 	originalSum, err := ReadGoSum()
 	if err != nil {
 		Fatal(err.Error(), ERR_READ)

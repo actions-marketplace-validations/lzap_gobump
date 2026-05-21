@@ -15,8 +15,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// ModuleVersionOrigin is the VCS origin recorded by the module proxy for a release.
-type ModuleVersionOrigin struct {
+type moduleVersionOrigin struct {
 	VCS  string `json:"VCS"`
 	URL  string `json:"URL"`
 	Hash string `json:"Hash"`
@@ -27,7 +26,7 @@ type ModuleVersionOrigin struct {
 type ModuleVersionInfo struct {
 	Version string              `json:"Version"`
 	Time    string              `json:"Time"`
-	Origin  ModuleVersionOrigin `json:"Origin"`
+	Origin  moduleVersionOrigin `json:"Origin"`
 }
 
 type GoProxy struct {
@@ -35,9 +34,7 @@ type GoProxy struct {
 	client  *http.Client
 }
 
-// ModuleProxyBaseURL resolves the module proxy base URL: a non-empty
-// explicit base URL, else the first usable entry in $GOPROXY, else the public proxy.
-func ModuleProxyBaseURL(explicit string) string {
+func moduleProxyBaseURL(explicit string) string {
 	explicit = strings.TrimSpace(explicit)
 	if explicit != "" {
 		return strings.TrimSuffix(explicit, "/")
@@ -60,14 +57,14 @@ func ModuleProxyBaseURL(explicit string) string {
 }
 
 func NewGoProxy(configured string) *GoProxy {
-	base := ModuleProxyBaseURL(configured)
+	base := moduleProxyBaseURL(configured)
 	return &GoProxy{
 		baseURL: base,
 		client:  NewHTTPClient(),
 	}
 }
 
-func IsPreRelease(version string) bool {
+func isPreRelease(version string) bool {
 	return strings.Contains(version, "-")
 }
 
@@ -104,7 +101,7 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 		line := scanner.Text()
 
 		// skip pre-release versions
-		if !IsPreRelease(version) && IsPreRelease(line) {
+		if !isPreRelease(version) && isPreRelease(line) {
 			continue
 		}
 
@@ -158,8 +155,7 @@ func (p *GoProxy) FetchVersionInfo(modPath, version string) (ModuleVersionInfo, 
 	return info, nil
 }
 
-// DiscardBody drains and closes a response body when the caller does not need it.
-func DiscardBody(resp *http.Response) {
+func discardBody(resp *http.Response) {
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 }

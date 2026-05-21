@@ -13,14 +13,14 @@ func Cmd(name string, args ...string) error {
 	return RunCmd(name, args, true)
 }
 
-func Cmdline(name string, args []string) string {
+func cmdline(name string, args []string) string {
 	if len(args) == 0 {
 		return name
 	}
 	return name + " " + strings.Join(args, " ")
 }
 
-func LogCmdResult(line string, stdout, stderr *bytes.Buffer, err error) {
+func logCmdResult(line string, stdout, stderr *bytes.Buffer, err error) {
 	exitCode := 0
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -43,7 +43,7 @@ func LogCmdResult(line string, stdout, stderr *bytes.Buffer, err error) {
 }
 
 func RunCmd(name string, args []string, logOutput bool) error {
-	line := Cmdline(name, args)
+	line := cmdline(name, args)
 	if logOutput {
 		Debug.Println("running:", line)
 	}
@@ -56,7 +56,7 @@ func RunCmd(name string, args []string, logOutput bool) error {
 	}
 	err := c.Run()
 	if logOutput && Debug.Enabled() {
-		LogCmdResult(line, &stdout, &stderr, err)
+		logCmdResult(line, &stdout, &stderr, err)
 	}
 	return err
 }
@@ -67,7 +67,7 @@ func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 		c.Env = subprocessEnv(name)
 		return c.Output()
 	}
-	line := Cmdline(name, args)
+	line := cmdline(name, args)
 	Debug.Println("running:", line)
 	c := exec.Command(name, args...)
 	c.Env = subprocessEnv(name)
@@ -75,14 +75,14 @@ func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 	c.Stdout = &stdout
 	c.Stderr = &stderr
 	err := c.Run()
-	LogCmdResult(line, &stdout, &stderr, err)
+	logCmdResult(line, &stdout, &stderr, err)
 	return stdout.Bytes(), err
 }
 
 func Cmds(str string) error {
 	parts := strings.Fields(str)
 	if len(parts) == 0 {
-		return fmt.Errorf("%w: no command", ErrCmd)
+		return fmt.Errorf("%w: no command", errCmd)
 	}
 
 	if len(parts) == 1 {

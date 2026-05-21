@@ -61,7 +61,7 @@ type AppConfig struct {
 
 var Config *AppConfig
 
-func IsCI() bool {
+func isCI() bool {
 	return os.Getenv("GITHUB_ACTIONS")+os.Getenv("GITLAB_CI")+os.Getenv("CIRCLECI") != ""
 }
 
@@ -77,7 +77,7 @@ func InitConfig() {
 
 	defaultFormat := "console"
 	defaultVerbose := false
-	if IsCI() {
+	if isCI() {
 		defaultFormat = "markdown"
 		defaultVerbose = true
 	}

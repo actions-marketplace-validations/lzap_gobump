@@ -8,8 +8,7 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-// AttemptUpgrade tries to upgrade a module to a specific version.
-func AttemptUpgrade(modulePath, version string) (*modfile.File, error) {
+func attemptUpgrade(modulePath, version string) (*modfile.File, error) {
 	err := Cmd(Config.GoBinary, "get", modulePath+"@"+version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get module: %w", err)
@@ -62,7 +61,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 			Fatal(err.Error(), ERR_READ)
 		}
 
-		newMod, err := AttemptUpgrade(r.Mod.Path, version.Version)
+		newMod, err := attemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
 			Debug.Println("upgrade unsuccessful, reverting go.mod and go.sum")
 			if err := RestoreModuleState(okMod, sumSnap); err != nil {
@@ -81,7 +80,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 		Debug.Println("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
-		if !RunCommands(okMod, sumSnap) {
+		if !runCommands(okMod, sumSnap) {
 			continue
 		}
 
@@ -91,9 +90,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 	return okMod, success, false
 }
 
-// RunCommands executes post-upgrade commands against the current go.mod on disk
-// (expected to match a successful upgrade). On failure it restores revertTo and sumSnap.
-func RunCommands(revertTo *modfile.File, sumSnap []byte) bool {
+func runCommands(revertTo *modfile.File, sumSnap []byte) bool {
 	for _, c := range Config.Commands {
 		if c == "" {
 			continue
@@ -111,7 +108,7 @@ func RunCommands(revertTo *modfile.File, sumSnap []byte) bool {
 	return true
 }
 
-func ValidateRequestedDependencies(original *modfile.File) error {
+func validateRequestedDependencies(original *modfile.File) error {
 	if len(Config.Dependencies) == 0 {
 		return nil
 	}
@@ -149,7 +146,7 @@ func Process(original *modfile.File) []Result {
 		Fatal(err.Error(), ERR_PARSE)
 	}
 
-	if err := ValidateRequestedDependencies(original); err != nil {
+	if err := validateRequestedDependencies(original); err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
 
@@ -202,14 +199,14 @@ func Process(original *modfile.File) []Result {
 		if perDepGit {
 			if !upgradeSuccess {
 				Debug.Println("git discard go.mod/go.sum after failed bump for", r.Mod.Path)
-				if err := GitDiscardGoModSumChanges(); err != nil {
+				if err := gitDiscardGoModSumChanges(); err != nil {
 					Err.Println("git discard go.mod/go.sum failed:", err.Error())
 				}
-			} else if versionAfter != r.Mod.Version && GitWorktreeDiffersFromHEAD() {
+			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
 				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
 				if err := GitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
 					Err.Println("git commit failed:", err.Error())
-					if err := GitDiscardGoModSumChanges(); err != nil {
+					if err := gitDiscardGoModSumChanges(); err != nil {
 						Err.Println("git discard go.mod/go.sum failed:", err.Error())
 					}
 					if okMod, err = ParseMod(goModFile); err != nil {
