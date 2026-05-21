@@ -97,7 +97,7 @@ func InitConfig() {
 	flag.IntVar(&Config.Retries, "retries", 5, "number of downgrade retries for each module (default: 5)")
 	flag.BoolVar(&Config.Changelog, "changelog", false, "fetch upstream git changelog for each updated module (embedded in per-dependency commit messages when git integration is enabled; otherwise aggregated at end per -changelog-dest)")
 	flag.StringVar(&Config.ChangelogDest, "changelog-dest", "stdout", "with -changelog and -no-git (or no usable git work tree): write aggregated changelogs to stdout (default), a file path, or \"gist\"; ignored when changelogs are committed per dependency")
-	flag.BoolVar(&Config.NoGit, "no-git", false, "if true, skip all git operations (no per-dependency commits or reset/clean on failure)")
+	flag.BoolVar(&Config.NoGit, "no-git", false, "if true, skip all git operations (no per-dependency commits or go.mod/go.sum discard on failure)")
 	flag.StringVar(&Config.GitUserName, "user-name", "Schutzbot", "git user.name for per-dependency commits (local repo config)")
 	flag.StringVar(&Config.GitUserEmail, "user-email", "schutzbot@gmail.com", "git user.email for per-dependency commits (local repo config)")
 	flag.StringVar(&Config.ModuleProxy, "proxy", "", "module proxy base URL (default: first usable $GOPROXY entry, else https://proxy.golang.org)")

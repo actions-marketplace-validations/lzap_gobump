@@ -129,16 +129,6 @@ func GitDiscardGoModSumChanges() error {
 	return nil
 }
 
-func GitResetHardHEAD() error {
-	if err := GitRun("reset", "--hard", "HEAD"); err != nil {
-		return fmt.Errorf("git reset --hard HEAD: %w", err)
-	}
-	if err := GitRun("clean", "-fdq"); err != nil {
-		return fmt.Errorf("git clean -fdq: %w", err)
-	}
-	return nil
-}
-
 func GitEnsureUserIdentity() error {
 	if err := GitRun("config", "user.name", Config.GitUserName); err != nil {
 		return fmt.Errorf("git config user.name: %w", err)

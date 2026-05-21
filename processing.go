@@ -165,9 +165,9 @@ func Process(original *modfile.File) []Result {
 
 		if perDepGit {
 			if !upgradeSuccess {
-				Debug.Println("git reset/clean after failed bump for", r.Mod.Path)
-				if err := GitResetHardHEAD(); err != nil {
-					Err.Println("git reset/clean failed:", err.Error())
+				Debug.Println("git discard go.mod/go.sum after failed bump for", r.Mod.Path)
+				if err := GitDiscardGoModSumChanges(); err != nil {
+					Err.Println("git discard go.mod/go.sum failed:", err.Error())
 				}
 			} else if versionAfter != r.Mod.Version && GitWorktreeDiffersFromHEAD() {
 				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
