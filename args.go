@@ -15,7 +15,15 @@ func (i *CommaSeparatedStringSlice) String() string {
 
 func (i *CommaSeparatedStringSlice) Set(value string) error {
 	if value != "" {
-		*i = strings.Split(value, ",")
+		parts := strings.Split(value, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		*i = out
 	}
 	return nil
 }
