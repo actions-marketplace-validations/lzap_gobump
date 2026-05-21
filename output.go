@@ -46,10 +46,10 @@ func debugEnabled() bool {
 }
 
 func writeDebugStderr(text ...any) {
-	if !debugEnabled() || len(text) == 0 {
+	if len(text) == 0 {
 		return
 	}
-	fmt.Fprintln(os.Stderr, joinAny(text...))
+	writeDebugfStderr("%s", joinAny(text...))
 }
 
 func writeDebugfStderr(format string, args ...any) {

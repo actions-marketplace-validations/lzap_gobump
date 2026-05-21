@@ -229,12 +229,12 @@ func PrintChangelogs(results []Result) {
 		}
 		token := githubToken()
 		if token == "" {
-			out.Error("Failed to create Gist: no GITHUB_TOKEN or GH_TOKEN set")
+			out.Debug("Failed to create Gist: no GITHUB_TOKEN or GH_TOKEN set")
 			return
 		}
 		gistURL, err := createGist(token, "GoBump Dependency Changelog", fullChangelog.String())
 		if err != nil {
-			out.Error("Failed to create Gist:", err.Error())
+			out.Debug("Failed to create Gist:", err.Error())
 		} else {
 			out.Println("\nChangelog Gist created:", gistURL)
 		}
@@ -252,7 +252,7 @@ func PrintChangelogs(results []Result) {
 		} else if config.ChangelogDest != "" {
 			err := os.WriteFile(config.ChangelogDest, []byte(sb.String()), 0644)
 			if err != nil {
-				out.Error("Failed to write changelog to file:", err.Error())
+				out.Debug("Failed to write changelog to file:", err.Error())
 			}
 		}
 	}

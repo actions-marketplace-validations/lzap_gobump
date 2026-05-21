@@ -37,7 +37,7 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 	versions, err := proxy.FetchVersions(r.Mod.Path, r.Mod.Version)
 	if err != nil {
-		out.Error("failed to fetch versions:", err.Error())
+		out.Debug("failed to fetch versions:", err.Error())
 		return okMod, success, false
 	}
 	out.Debug("proxy returned", len(versions), "newer version(s) for", r.Mod.Path)
@@ -49,24 +49,24 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 	for vi, version := range versions {
 		if vi >= config.Retries {
-			out.Error("too many failed attempts, giving up")
+			out.Debug("too many failed attempts, giving up")
 			break
 		}
 
 		out.Debug("attempt", vi+1, "of", min(config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
 		newMod, err := attemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
-			out.Error("upgrade unsuccessful, reverting go.mod")
+			out.Debug("upgrade unsuccessful, reverting go.mod")
 			if err := saveMod(config.GoModDst, okMod); err != nil {
-				out.Error("failed to revert go.mod:", err.Error())
+				out.Debug("failed to revert go.mod:", err.Error())
 			}
 			continue
 		}
 
 		if err := validateUpgrade(okMod, newMod); err != nil {
-			out.Error(fmt.Sprintf("%s; reverting go.mod", err.Error()))
+			out.Debugf("%s; reverting go.mod", err.Error())
 			if err := saveMod(config.GoModDst, okMod); err != nil {
-				out.Error("failed to revert go.mod:", err.Error())
+				out.Debug("failed to revert go.mod:", err.Error())
 			}
 			continue
 		}
@@ -92,9 +92,9 @@ func runCommands(revertTo *modfile.File) bool {
 		}
 		out.Debug("running -exec:", c)
 		if err := cmds(c); err != nil {
-			out.Error("tests failed, reverting go.mod")
+			out.Debug("exec failed, reverting go.mod")
 			if err := saveMod(config.GoModDst, revertTo); err != nil {
-				out.Error("failed to revert go.mod:", err.Error())
+				out.Debug("failed to revert go.mod:", err.Error())
 			}
 			return false
 		}
@@ -161,12 +161,12 @@ func process(original *modfile.File) []Result {
 			if !upgradeSuccess {
 				out.Debug("git reset/clean after failed bump for", r.Mod.Path)
 				if err := gitResetHardHEAD(); err != nil {
-					out.Error("git reset/clean failed:", err.Error())
+					out.Debug("git reset/clean failed:", err.Error())
 				}
 			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
 				out.Debug("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
 				if err := gitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
-					out.Error("git commit failed:", err.Error())
+					out.Debug("git commit failed:", err.Error())
 				}
 			}
 		}
