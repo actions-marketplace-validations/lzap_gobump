@@ -14,7 +14,7 @@ func AttemptUpgrade(modulePath, version string) (*modfile.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get module: %w", err)
 	}
-	return ParseMod(Config.GoModSrc)
+	return ParseMod(goModFile)
 }
 
 // ValidateUpgrade checks if the upgrade is valid.
@@ -54,7 +54,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 		}
 
 		Debug.Println("attempt", vi+1, "of", min(Config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
-		sumSnap, err := ReadGoSum(Config.GoModDst)
+		sumSnap, err := ReadGoSum()
 		if err != nil {
 			Fatal(err.Error(), ERR_READ)
 		}
@@ -62,7 +62,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 		newMod, err := AttemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
 			Debug.Println("upgrade unsuccessful, reverting go.mod and go.sum")
-			if err := RestoreModuleState(Config.GoModDst, okMod, sumSnap); err != nil {
+			if err := RestoreModuleState(okMod, sumSnap); err != nil {
 				Debug.Println("failed to revert module state:", err.Error())
 			}
 			continue
@@ -70,7 +70,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 		if err := ValidateUpgrade(okMod, newMod); err != nil {
 			Debug.Printf("%s; reverting go.mod and go.sum\n", err.Error())
-			if err := RestoreModuleState(Config.GoModDst, okMod, sumSnap); err != nil {
+			if err := RestoreModuleState(okMod, sumSnap); err != nil {
 				Debug.Println("failed to revert module state:", err.Error())
 			}
 			continue
@@ -98,7 +98,7 @@ func RunCommands(revertTo *modfile.File, sumSnap []byte) bool {
 		Debug.Println("running -exec:", c)
 		if err := Cmds(c); err != nil {
 			Debug.Println("exec failed, reverting go.mod and go.sum")
-			if err := RestoreModuleState(Config.GoModDst, revertTo, sumSnap); err != nil {
+			if err := RestoreModuleState(revertTo, sumSnap); err != nil {
 				Debug.Println("failed to revert module state:", err.Error())
 			}
 			return false
@@ -141,7 +141,7 @@ func ValidateRequestedDependencies(original *modfile.File) error {
 func Process(original *modfile.File) []Result {
 	var results []Result
 	proxy := NewGoProxy(Config.ModuleProxy)
-	okMod, err := ParseMod(Config.GoModSrc)
+	okMod, err := ParseMod(goModFile)
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
@@ -209,7 +209,7 @@ func Process(original *modfile.File) []Result {
 					if err := GitDiscardGoModSumChanges(); err != nil {
 						Err.Println("git discard go.mod/go.sum failed:", err.Error())
 					}
-					if okMod, err = ParseMod(Config.GoModSrc); err != nil {
+					if okMod, err = ParseMod(goModFile); err != nil {
 						Fatal(err.Error(), ERR_PARSE)
 					}
 					upgradeSuccess = false

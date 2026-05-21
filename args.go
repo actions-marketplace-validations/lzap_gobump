@@ -45,8 +45,6 @@ type AppConfig struct {
 	DryRun        bool
 	Verbose       bool
 	Format        string
-	GoModSrc      string
-	GoModDst      string
 	Retries       int
 	Commands      StringSlice
 	GoBinary      string
@@ -92,8 +90,6 @@ func InitConfig() {
 	flag.Var(&commands, "exec", "exec command for each individual bump, can be used multiple times")
 	flag.Var(&exclude, "exclude", "comma-separated list of modules to exclude from update")
 	flag.StringVar(&Config.Format, "format", defaultFormat, "output format (console, markdown, none)")
-	flag.StringVar(&Config.GoModSrc, "src-go-mod", "go.mod", "path to go.mod source file (default: go.mod)")
-	flag.StringVar(&Config.GoModDst, "dst-go-mod", "go.mod", "path to go.mod destination file (default: go.mod)")
 	flag.IntVar(&Config.Retries, "retries", 5, "number of downgrade retries for each module (default: 5)")
 	flag.BoolVar(&Config.Changelog, "changelog", false, "fetch upstream git changelog for each updated module (embedded in per-dependency commit messages when git integration is enabled; otherwise aggregated at end per -changelog-dest)")
 	flag.StringVar(&Config.ChangelogDest, "changelog-dest", "stdout", "with -changelog and -no-git (or no usable git work tree): write aggregated changelogs to stdout (default), a file path, or \"gist\"; ignored when changelogs are committed per dependency")

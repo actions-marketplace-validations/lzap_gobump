@@ -58,9 +58,7 @@ This repository’s `go.mod` targets a recent Go release; use a `gobump` binary 
   -changelog-dest string
     	with -changelog and -no-git (or no usable git work tree): write aggregated changelogs to stdout (default), a file path, or "gist"; ignored when changelogs are committed per dependency (default "stdout")
   -dry-run
-    	revert to original go.mod after running
-  -dst-go-mod string
-    	path to go.mod destination file (default: go.mod) (default "go.mod")
+    	revert to original go.mod and go.sum after running
   -exclude value
     	comma-separated list of modules to exclude from update
   -exec value
@@ -79,12 +77,10 @@ This repository’s `go.mod` targets a recent Go release; use a `gobump` binary 
     	git user.email for per-dependency commits (local repo config) (default "schutzbot@gmail.com")
   -user-name string
     	git user.name for per-dependency commits (local repo config) (default "Schutzbot")
-  -src-go-mod string
-    	path to go.mod source file (default: go.mod) (default "go.mod")
   -verbose
     	print more information including stderr of executed commands
   -version
-    	print Go binary debug info
+    	print gobump version and module checksum
 ```
 
 With `-changelog`, upstream commits between the old and new module versions are fetched (via the module proxy and GitHub). By default, each successful bump commit includes that module’s changelog in the message body. Use `-no-git` if you prefer a single aggregated changelog at the end instead.
@@ -226,7 +222,7 @@ It is possible to use a different binary than `go`; set the `GOVERSION=go1.21.0`
 
 ## Testing
 
-Integration tests under `main_test.go` write `testdata/*.out` paths as temporary `go.mod` targets during `-dry-run` runs; they are not checked-in golden files.
+Integration tests under `main_test.go` run `-dry-run` inside each `testdata/<case>/` directory, which contains a self-contained `go.mod` and `go.sum`. The repository root module is not modified.
 
 ## Discussion
 

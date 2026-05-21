@@ -20,9 +20,8 @@ func TestPerDependencyGitEnabled(t *testing.T) {
 	}
 
 	Config = &AppConfig{
-		GoModDst: "go.mod",
-		NoGit:    false,
-		DryRun:   false,
+		NoGit:  false,
+		DryRun: false,
 	}
 	if PerDependencyGitEnabled() {
 		t.Fatal("expected false without git repository")

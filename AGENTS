@@ -34,13 +34,12 @@ go fmt ./...
 Exercise gobump against **testdata** only, never the project module:
 
 ```bash
-GOTOOLCHAIN=go1.24.12 go run . -dry-run \
-  -src-go-mod testdata/go-mod-middleware.in \
-  -dst-go-mod /tmp/gobump-test.out \
-  -format none
+( cd testdata/go-mod-middleware && GOTOOLCHAIN=go1.24.12 go run github.com/lzap/gobump@latest -dry-run -format none )
 ```
 
-Changelog or integration checks that need the network should use unit tests (e.g. `TestGetChangelogGolangOrgModule`) or a **copy** of `go.mod` in `/tmp`, not this repository’s files.
+Other fixtures live under `testdata/go-mod-*` (each with its own `go.mod` and `go.sum`). Regenerate checksums after editing a fixture: `cd testdata/<case> && go mod download`.
+
+Changelog or integration checks that need the network should use unit tests (e.g. `TestGetChangelogGolangOrgModule`), not this repository’s root `go.mod`.
 
 ## When changing `go.mod` / `go.sum` is allowed
 

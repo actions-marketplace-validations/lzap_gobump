@@ -9,11 +9,6 @@ import (
 func main() {
 	InitConfig()
 
-	if err := PrepareGoModWorkspace(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		os.Exit(ERR_READ)
-	}
-
 	if Config.Version {
 		if info, ok := debug.ReadBuildInfo(); ok {
 			fmt.Printf("%s %s\n", info.Main.Version, info.Main.Sum)
@@ -34,18 +29,18 @@ func main() {
 		defer PrintMarkdownFooter()
 	}
 
-	original, err := ParseMod(Config.GoModSrc)
+	original, err := ParseMod(goModFile)
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
-	originalSum, err := ReadGoSum(Config.GoModSrc)
+	originalSum, err := ReadGoSum()
 	if err != nil {
 		Fatal(err.Error(), ERR_READ)
 	}
 
 	defer func() {
 		if Config.DryRun {
-			if err := RestoreModuleState(Config.GoModDst, original, originalSum); err != nil {
+			if err := RestoreModuleState(original, originalSum); err != nil {
 				Fatal(err.Error(), ERR_WRITE)
 			}
 		}

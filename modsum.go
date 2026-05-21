@@ -8,14 +8,16 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-// GoSumPath returns go.sum in the same directory as the go.mod file.
-func GoSumPath(goModPath string) string {
-	return filepath.Join(filepath.Dir(goModPath), "go.sum")
+const goModFile = "go.mod"
+
+// GoSumPath returns go.sum in the same directory as go.mod (current working directory).
+func GoSumPath() string {
+	return filepath.Join(filepath.Dir(goModFile), "go.sum")
 }
 
-// ReadGoSum reads go.sum for the module that owns goModPath.
-func ReadGoSum(goModPath string) ([]byte, error) {
-	sumPath := GoSumPath(goModPath)
+// ReadGoSum reads go.sum for the module in the current directory.
+func ReadGoSum() ([]byte, error) {
+	sumPath := GoSumPath()
 	data, err := os.ReadFile(sumPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -26,12 +28,12 @@ func ReadGoSum(goModPath string) ([]byte, error) {
 	return data, nil
 }
 
-// RestoreModuleState writes mod to goModPath and restores go.sum to sum.
-func RestoreModuleState(goModPath string, mod *modfile.File, sum []byte) error {
-	if err := SaveMod(goModPath, mod); err != nil {
+// RestoreModuleState writes mod and restores go.sum.
+func RestoreModuleState(mod *modfile.File, sum []byte) error {
+	if err := SaveMod(goModFile, mod); err != nil {
 		return err
 	}
-	if err := os.WriteFile(GoSumPath(goModPath), sum, 0644); err != nil {
+	if err := os.WriteFile(GoSumPath(), sum, 0644); err != nil {
 		return fmt.Errorf("error writing go.sum: %w", err)
 	}
 	return nil

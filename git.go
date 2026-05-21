@@ -63,7 +63,7 @@ func GitOutput(args ...string) ([]byte, error) {
 }
 
 func GoModSumPathsForGit() []string {
-	return []string{Config.GoModDst, GoSumPath(Config.GoModDst)}
+	return []string{goModFile, GoSumPath()}
 }
 
 func GitWorktreeDiffersFromHEAD() bool {
