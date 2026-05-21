@@ -6,10 +6,6 @@ import (
 	"runtime/debug"
 )
 
-var (
-	out Output
-)
-
 func main() {
 	InitConfig()
 
@@ -22,38 +18,33 @@ func main() {
 		os.Exit(0)
 	}
 
-	switch config.Format {
-	case "markdown":
-		out = NewOutputMarkdown(os.Stdout)
-	case "console":
-		out = &OutputConsole{}
-	default:
-		out = &OutputNone{}
-	}
+	InitLoggers()
 
 	if err := errIfUnsafeGitWorktree(); err != nil {
-		out.Fatal(err.Error(), ERR_GIT)
+		fatal(err.Error(), ERR_GIT)
 	}
 
-	out.Begin()
-	defer out.End()
+	if config.Format == "markdown" {
+		printMarkdownHeader()
+		defer printMarkdownFooter()
+	}
 
 	original, err := parseMod(config.GoModSrc)
 	if err != nil {
-		out.Fatal(err.Error(), ERR_PARSE)
+		fatal(err.Error(), ERR_PARSE)
 	}
 
 	defer func() {
 		if config.DryRun {
 			if err := saveMod(config.GoModDst, original); err != nil {
-				out.Fatal(err.Error(), ERR_WRITE)
+				fatal(err.Error(), ERR_WRITE)
 			}
 		}
 	}()
 
 	results := process(original)
 
-	out.PrintSummary(results)
+	printResults(results)
 	if config.Changelog && !perDependencyGitEnabled() {
 		PrintChangelogs(results)
 	}

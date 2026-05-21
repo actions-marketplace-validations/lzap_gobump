@@ -1,37 +1,40 @@
 package main
 
 import (
-	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
 )
 
-type Output interface {
-	Begin(text ...any)
-	Header(text string)
-	BeginPreformatted(text ...any)
-	EndPreformatted(text ...any)
-	EndPreformattedCond(render bool, text ...any)
-	End(text ...any)
-	Error(str ...string)
-	Debug(text ...any)
-	Debugf(format string, args ...any)
-	Fatal(msg string, code ...int)
-	Write(buf []byte) (int, error)
-	Println(text ...string)
-	PrintSummary(results []Result)
+var (
+	Out   *log.Logger
+	Debug *log.Logger
+	Err   *log.Logger
+)
+
+func InitLoggers() {
+	Err = log.New(os.Stderr, "", 0)
+	if debugEnabled() {
+		Debug = Err
+	} else {
+		Debug = log.New(io.Discard, "", 0)
+	}
+
+	outWriter := io.Writer(os.Stdout)
+	if config.Format == "none" {
+		outWriter = io.Discard
+	}
+	Out = log.New(outWriter, "", 0)
 }
 
-func joinAny(text ...any) string {
-	if len(text) == 0 {
-		return ""
-	}
+func fatal(msg string, code int) {
+	Err.Println(msg)
+	os.Exit(code)
+}
 
-	var str []string
-	for _, t := range text {
-		str = append(str, fmt.Sprint(t))
-	}
-	return strings.Join(str, " ")
+func debugEnabled() bool {
+	return config != nil && config.Verbose
 }
 
 func strOrDash(str string) string {
@@ -41,20 +44,87 @@ func strOrDash(str string) string {
 	return str
 }
 
-func debugEnabled() bool {
-	return config != nil && config.Verbose
+func printResults(results []Result) {
+	switch config.Format {
+	case "markdown":
+		printMarkdownResults(results)
+	case "console":
+		printConsoleResults(results)
+	}
 }
 
-func writeDebugStderr(text ...any) {
-	if len(text) == 0 {
-		return
-	}
-	writeDebugfStderr("%s", joinAny(text...))
+func printMarkdownHeader() {
+	Out.Println("## Pinned Go version dependency update")
 }
 
-func writeDebugfStderr(format string, args ...any) {
-	if !debugEnabled() {
+func printMarkdownFooter() {
+	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", BuildID())
+}
+
+func markdownTableRow(cells ...string) string {
+	return "| " + strings.Join(cells, " | ") + " |"
+}
+
+func markdownStatus(r Result) string {
+	if r.Excluded {
+		return "X"
+	}
+	if r.NoProxyVersions {
+		return "N"
+	}
+	if r.Success {
+		if r.VersionAfter == r.VersionBefore {
+			return "-"
+		}
+		return "U"
+	}
+	return "E"
+}
+
+func printMarkdownResults(results []Result) {
+	Out.Println("| Module | Status | Version |")
+	Out.Println("| --- | --- | --- |")
+	for _, r := range results {
+		Out.Println(markdownTableRow(
+			r.ModulePath,
+			markdownStatus(r),
+			strOrDash(r.VersionBefore)+" > "+strOrDash(r.VersionAfter),
+		))
+	}
+	Out.Println("Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.")
+}
+
+func consoleStatus(r Result) string {
+	if r.Excluded {
+		return "excluded"
+	}
+	if r.NoProxyVersions {
+		return "noop"
+	}
+	if r.Success {
+		if r.VersionAfter == r.VersionBefore {
+			return "keep"
+		}
+		return "update"
+	}
+	return "err"
+}
+
+func printConsoleUpdate(path, version string) {
+	if config.Format != "console" {
 		return
 	}
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	Out.Printf("go get %s@%s\n", path, version)
+}
+
+func printConsoleResults(results []Result) {
+	Out.Println(color("summary:", ColorBold))
+	for _, r := range results {
+		action := consoleStatus(r)
+		if r.VersionAfter != "" && r.VersionAfter != r.VersionBefore {
+			Out.Println(r.ModulePath, action, r.VersionBefore, "->", r.VersionAfter)
+		} else {
+			Out.Println(r.ModulePath, action)
+		}
+	}
 }

@@ -17,7 +17,7 @@ const (
 	ERR_GIT   = 6
 )
 
-// cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via out.Debug.
+// cmd runs a subprocess; when verbose, logs the command line, stdout, stderr, and exit code to stderr via Debug.
 func cmd(name string, args ...string) error {
 	return runCmd(name, args, true)
 }
@@ -39,22 +39,22 @@ func logCmdResult(cmdline string, stdout, stderr *bytes.Buffer, err error) {
 			exitCode = -1
 		}
 	}
-	out.Debugf("exit code: %d", exitCode)
+	Debug.Printf("exit code: %d\n", exitCode)
 	if stdout.Len() > 0 {
-		out.Debug("stdout:\n" + stdout.String())
+		Debug.Println("stdout:\n" + stdout.String())
 	}
 	if stderr.Len() > 0 {
-		out.Debug("stderr:\n" + stderr.String())
+		Debug.Println("stderr:\n" + stderr.String())
 	}
 	if err != nil {
-		out.Debug("command failed:", err.Error())
+		Debug.Println("command failed:", err.Error())
 	}
 }
 
 func runCmd(name string, args []string, logOutput bool) error {
 	line := cmdline(name, args)
 	if logOutput && debugEnabled() {
-		out.Debug("running:", line)
+		Debug.Println("running:", line)
 	}
 	c := exec.Command(name, args...)
 	c.Env = os.Environ()
@@ -77,7 +77,7 @@ func runCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
 		return c.Output()
 	}
 	line := cmdline(name, args)
-	out.Debug("running:", line)
+	Debug.Println("running:", line)
 	c := exec.Command(name, args...)
 	c.Env = os.Environ()
 	var stdout, stderr bytes.Buffer

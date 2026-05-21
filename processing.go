@@ -33,14 +33,14 @@ func validateUpgrade(originalMod, newMod *modfile.File) error {
 func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*modfile.File, bool, bool) {
 	var success bool
 	var noProxyVersions bool
-	out.Debug("bump module", r.Mod.Path, "from", r.Mod.Version)
+	Debug.Println("bump module", r.Mod.Path, "from", r.Mod.Version)
 
 	versions, err := proxy.FetchVersions(r.Mod.Path, r.Mod.Version)
 	if err != nil {
-		out.Debug("failed to fetch versions:", err.Error())
+		Debug.Println("failed to fetch versions:", err.Error())
 		return okMod, success, false
 	}
-	out.Debug("proxy returned", len(versions), "newer version(s) for", r.Mod.Path)
+	Debug.Println("proxy returned", len(versions), "newer version(s) for", r.Mod.Path)
 	if len(versions) == 0 {
 		success = true
 		noProxyVersions = true
@@ -49,29 +49,29 @@ func upgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) (*mo
 
 	for vi, version := range versions {
 		if vi >= config.Retries {
-			out.Debug("too many failed attempts, giving up")
+			Debug.Println("too many failed attempts, giving up")
 			break
 		}
 
-		out.Debug("attempt", vi+1, "of", min(config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
+		Debug.Println("attempt", vi+1, "of", min(config.Retries, len(versions)), r.Mod.Path+"@"+version.Version)
 		newMod, err := attemptUpgrade(r.Mod.Path, version.Version)
 		if err != nil {
-			out.Debug("upgrade unsuccessful, reverting go.mod")
+			Debug.Println("upgrade unsuccessful, reverting go.mod")
 			if err := saveMod(config.GoModDst, okMod); err != nil {
-				out.Debug("failed to revert go.mod:", err.Error())
+				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			continue
 		}
 
 		if err := validateUpgrade(okMod, newMod); err != nil {
-			out.Debugf("%s; reverting go.mod", err.Error())
+			Debug.Printf("%s; reverting go.mod\n", err.Error())
 			if err := saveMod(config.GoModDst, okMod); err != nil {
-				out.Debug("failed to revert go.mod:", err.Error())
+				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			continue
 		}
 
-		out.Debug("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
+		Debug.Println("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
 		if !runCommands(okMod) {
 			continue
@@ -90,15 +90,15 @@ func runCommands(revertTo *modfile.File) bool {
 		if c == "" {
 			continue
 		}
-		out.Debug("running -exec:", c)
+		Debug.Println("running -exec:", c)
 		if err := cmds(c); err != nil {
-			out.Debug("exec failed, reverting go.mod")
+			Debug.Println("exec failed, reverting go.mod")
 			if err := saveMod(config.GoModDst, revertTo); err != nil {
-				out.Debug("failed to revert go.mod:", err.Error())
+				Debug.Println("failed to revert go.mod:", err.Error())
 			}
 			return false
 		}
-		out.Debug("-exec succeeded:", c)
+		Debug.Println("-exec succeeded:", c)
 	}
 	return true
 }
@@ -108,7 +108,7 @@ func process(original *modfile.File) []Result {
 	proxy := NewGoProxy(config.ModuleProxy)
 	okMod, err := parseMod(config.GoModSrc)
 	if err != nil {
-		out.Fatal(err.Error(), ERR_PARSE)
+		fatal(err.Error(), ERR_PARSE)
 	}
 
 	perDepGit := perDependencyGitEnabled()
@@ -159,16 +159,20 @@ func process(original *modfile.File) []Result {
 
 		if perDepGit {
 			if !upgradeSuccess {
-				out.Debug("git reset/clean after failed bump for", r.Mod.Path)
+				Debug.Println("git reset/clean after failed bump for", r.Mod.Path)
 				if err := gitResetHardHEAD(); err != nil {
-					out.Debug("git reset/clean failed:", err.Error())
+					Err.Println("git reset/clean failed:", err.Error())
 				}
 			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
-				out.Debug("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
+				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
 				if err := gitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
-					out.Debug("git commit failed:", err.Error())
+					Err.Println("git commit failed:", err.Error())
 				}
 			}
+		}
+
+		if upgradeSuccess && versionAfter != r.Mod.Version {
+			printConsoleUpdate(r.Mod.Path, versionAfter)
 		}
 
 		result := Result{
