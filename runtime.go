@@ -2,11 +2,6 @@ package main
 
 import "runtime/debug"
 
-const (
-	// BuildCommitChars is the number of characters to show in the build commit.
-	BuildCommitChars = 5
-)
-
 var (
 	// Use linker flag to customize it: -X 'github.com/lzap/gobump.BuildCommit=1234567
 	BuildCommit string = "HEAD"

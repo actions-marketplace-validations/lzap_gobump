@@ -8,8 +8,6 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-const goModFile = "go.mod"
-
 func goSumPath() string {
 	return filepath.Join(filepath.Dir(goModFile), "go.sum")
 }
