@@ -118,7 +118,7 @@ func PrintConsoleUpdate(path, version string) {
 }
 
 func PrintConsoleResults(results []Result) {
-	Out.Println(Color("summary:", ColorBold))
+	Out.Println("summary:")
 	for _, r := range results {
 		action := ConsoleStatus(r)
 		if r.VersionAfter != "" && r.VersionAfter != r.VersionBefore {
