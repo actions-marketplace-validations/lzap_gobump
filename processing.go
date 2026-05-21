@@ -146,7 +146,69 @@ func validateRequestedDependencies(original *modfile.File) error {
 	return nil
 }
 
+// selectDependencies returns the list of dependencies to process based on
+// Config.Dependencies (positional arguments) or all direct dependencies if none specified.
+func selectDependencies(original *modfile.File) []*modfile.Require {
+	if len(Config.Dependencies) == 0 {
+		return original.Require
+	}
+
+	selected := []*modfile.Require{}
+	for _, r := range original.Require {
+		for _, d := range Config.Dependencies {
+			if r.Mod.Path == d {
+				selected = append(selected, r)
+			}
+		}
+	}
+	return selected
+}
+
+// extractVersionAfter finds the new version of a module after an upgrade attempt.
+func extractVersionAfter(mod *modfile.File, modulePath, fallback string) string {
+	if mod == nil {
+		return fallback
+	}
+	mi := slices.IndexFunc(mod.Require, func(re *modfile.Require) bool {
+		return re.Mod.Path == modulePath
+	})
+	if mi != -1 {
+		return mod.Require[mi].Mod.Version
+	}
+	return fallback
+}
+
+// handleGitIntegration performs per-dependency git operations (commit or discard).
+// Returns the final success status and version after git operations.
+func handleGitIntegration(result upgradeResult, modulePath, versionBefore, versionAfter string) (bool, string) {
+	if !result.Success {
+		Debug.Println("git discard go.mod/go.sum after failed bump for", modulePath)
+		if err := gitDiscardGoModSumChanges(); err != nil {
+			Err.Println("git discard go.mod/go.sum failed:", err.Error())
+		}
+		return false, versionBefore
+	}
+
+	if versionAfter == versionBefore || !gitWorktreeDiffersFromHEAD() {
+		return true, versionAfter
+	}
+
+	Debug.Println("git commit bump for", modulePath, versionBefore, "->", versionAfter)
+	if err := GitCommitDependencyBump(modulePath, versionBefore, versionAfter); err != nil {
+		Err.Println("git commit failed:", err.Error())
+		if err := gitDiscardGoModSumChanges(); err != nil {
+			Err.Println("git discard go.mod/go.sum failed:", err.Error())
+		}
+		return false, versionBefore
+	}
+	return true, versionAfter
+}
+
 func Process(original *modfile.File) []Result {
+	if err := validateRequestedDependencies(original); err != nil {
+		Fatal(err.Error(), ERR_PARSE)
+	}
+
 	var results []Result
 	proxy := newGoProxy(Config.ModuleProxy)
 	okMod, err := ParseMod(goModFile)
@@ -154,23 +216,8 @@ func Process(original *modfile.File) []Result {
 		Fatal(err.Error(), ERR_PARSE)
 	}
 
-	if err := validateRequestedDependencies(original); err != nil {
-		Fatal(err.Error(), ERR_PARSE)
-	}
-
 	perDepGit := PerDependencyGitEnabled()
-
-	dependencies := original.Require
-	if len(Config.Dependencies) > 0 {
-		dependencies = []*modfile.Require{}
-		for _, r := range original.Require {
-			for _, d := range Config.Dependencies {
-				if r.Mod.Path == d {
-					dependencies = append(dependencies, r)
-				}
-			}
-		}
-	}
+	dependencies := selectDependencies(original)
 
 	for _, r := range dependencies {
 		if r.Indirect {
@@ -193,40 +240,20 @@ func Process(original *modfile.File) []Result {
 		}
 
 		result := UpgradeModule(proxy, r, okMod)
-
-		versionAfter := r.Mod.Version
-		if result.Mod != nil {
-			mi := slices.IndexFunc(result.Mod.Require, func(re *modfile.Require) bool {
-				return re.Mod.Path == r.Mod.Path
-			})
-			if mi != -1 {
-				versionAfter = result.Mod.Require[mi].Mod.Version
-			}
-		}
+		versionAfter := extractVersionAfter(result.Mod, r.Mod.Path, r.Mod.Version)
+		success := result.Success
 
 		if perDepGit {
-			if !result.Success {
-				Debug.Println("git discard go.mod/go.sum after failed bump for", r.Mod.Path)
-				if err := gitDiscardGoModSumChanges(); err != nil {
-					Err.Println("git discard go.mod/go.sum failed:", err.Error())
-				}
-			} else if versionAfter != r.Mod.Version && gitWorktreeDiffersFromHEAD() {
-				Debug.Println("git commit bump for", r.Mod.Path, r.Mod.Version, "->", versionAfter)
-				if err := GitCommitDependencyBump(r.Mod.Path, r.Mod.Version, versionAfter); err != nil {
-					Err.Println("git commit failed:", err.Error())
-					if err := gitDiscardGoModSumChanges(); err != nil {
-						Err.Println("git discard go.mod/go.sum failed:", err.Error())
-					}
-					if okMod, err = ParseMod(goModFile); err != nil {
-						Fatal(err.Error(), ERR_PARSE)
-					}
-					result.Success = false
-					versionAfter = r.Mod.Version
+			success, versionAfter = handleGitIntegration(result, r.Mod.Path, r.Mod.Version, versionAfter)
+			if !success {
+				// Git commit failed; reload the current state
+				if okMod, err = ParseMod(goModFile); err != nil {
+					Fatal(err.Error(), ERR_PARSE)
 				}
 			}
 		}
 
-		if result.Success && versionAfter != r.Mod.Version {
+		if success && versionAfter != r.Mod.Version {
 			printConsoleUpdate(r.Mod.Path, versionAfter)
 		}
 
@@ -234,11 +261,11 @@ func Process(original *modfile.File) []Result {
 			ModulePath:      r.Mod.Path,
 			VersionBefore:   r.Mod.Version,
 			VersionAfter:    versionAfter,
-			Success:         result.Success,
+			Success:         success,
 			NoProxyVersions: result.NoProxyVersions,
 		}
 
-		if result.Success {
+		if success {
 			okMod = result.Mod
 		}
 
