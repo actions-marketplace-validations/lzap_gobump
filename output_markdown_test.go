@@ -70,7 +70,7 @@ func TestOutputMarkdownPrintSummary(t *testing.T) {
 | example.com/mod | U | v1.0.0 > v2.0.0 |
 | example.com/unchanged | - | v1.0.0 > v1.0.0 |
 
-Status: **U** updated, **E** error, **X** excluded, **N** no newer versions on module proxy, **-** unchanged.
+Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.
 `
 
 	if diff := cmp.Diff(expected, buf.String()); diff != "" {

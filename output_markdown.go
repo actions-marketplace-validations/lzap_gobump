@@ -159,5 +159,5 @@ func (out *OutputMarkdown) PrintSummary(results []Result) {
 	}
 
 	fmt.Fprintln(out.w, "")
-	fmt.Fprintln(out.w, "Status: **U** updated, **E** error, **X** excluded, **N** no newer versions on module proxy, **-** unchanged.")
+	fmt.Fprintln(out.w, "Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.")
 }
