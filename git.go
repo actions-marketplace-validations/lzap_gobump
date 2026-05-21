@@ -63,13 +63,7 @@ func GitOutput(args ...string) ([]byte, error) {
 }
 
 func GoModSumPathsForGit() []string {
-	modPath := Config.GoModDst
-	sumPath := strings.TrimSuffix(modPath, ".mod") + ".sum"
-	paths := []string{modPath}
-	if st, err := os.Stat(sumPath); err == nil && !st.IsDir() {
-		paths = append(paths, sumPath)
-	}
-	return paths
+	return []string{Config.GoModDst, GoSumPath(Config.GoModDst)}
 }
 
 func GitWorktreeDiffersFromHEAD() bool {

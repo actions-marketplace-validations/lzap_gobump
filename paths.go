@@ -8,8 +8,8 @@ import (
 )
 
 // PrepareGoModWorkspace ensures go get runs in the directory that contains the
-// destination go.mod. When src and dst differ, src (and go.sum when present) is
-// copied to dst first; both config paths are then set to the basename of dst.
+// destination go.mod. When src and dst differ, src and go.sum are copied to dst's
+// directory first; both config paths are then set to the basename of dst.
 func PrepareGoModWorkspace() error {
 	src, err := filepath.Abs(Config.GoModSrc)
 	if err != nil {
@@ -41,19 +41,11 @@ func copyGoModPair(srcMod, dstMod string) error {
 	if err := copyFile(srcMod, dstMod); err != nil {
 		return fmt.Errorf("copy go.mod: %w", err)
 	}
-	srcSum := GoSumPath(srcMod)
-	dstSum := GoSumPath(dstMod)
-	sumData, err := os.ReadFile(srcSum)
+	sumData, err := ReadGoSum(srcMod)
 	if err != nil {
-		if os.IsNotExist(err) {
-			if err := os.Remove(dstSum); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("remove go.sum: %w", err)
-			}
-			return nil
-		}
-		return fmt.Errorf("read go.sum: %w", err)
+		return err
 	}
-	if err := os.WriteFile(dstSum, sumData, 0644); err != nil {
+	if err := os.WriteFile(GoSumPath(dstMod), sumData, 0644); err != nil {
 		return fmt.Errorf("write go.sum: %w", err)
 	}
 	return nil

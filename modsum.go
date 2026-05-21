@@ -3,42 +3,35 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"golang.org/x/mod/modfile"
 )
 
-// GoSumPath returns the go.sum path adjacent to a go.mod path.
+// GoSumPath returns go.sum in the same directory as the go.mod file.
 func GoSumPath(goModPath string) string {
-	return strings.TrimSuffix(goModPath, ".mod") + ".sum"
+	return filepath.Join(filepath.Dir(goModPath), "go.sum")
 }
 
-// ReadGoSumSnapshot reads go.sum bytes beside goModPath. hadSum is false when the file is absent.
-func ReadGoSumSnapshot(goModPath string) (data []byte, hadSum bool, err error) {
+// ReadGoSum reads go.sum for the module that owns goModPath.
+func ReadGoSum(goModPath string) ([]byte, error) {
 	sumPath := GoSumPath(goModPath)
-	data, err = os.ReadFile(sumPath)
+	data, err := os.ReadFile(sumPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, false, nil
+			return nil, fmt.Errorf("missing %s", sumPath)
 		}
-		return nil, false, fmt.Errorf("error reading go.sum: %w", err)
+		return nil, fmt.Errorf("error reading %s: %w", sumPath, err)
 	}
-	return data, true, nil
+	return data, nil
 }
 
-// RestoreModuleState writes mod to goModPath and restores go.sum to the given snapshot.
-func RestoreModuleState(goModPath string, mod *modfile.File, sum []byte, hadSum bool) error {
+// RestoreModuleState writes mod to goModPath and restores go.sum to sum.
+func RestoreModuleState(goModPath string, mod *modfile.File, sum []byte) error {
 	if err := SaveMod(goModPath, mod); err != nil {
 		return err
 	}
-	sumPath := GoSumPath(goModPath)
-	if !hadSum {
-		if err := os.Remove(sumPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("error removing go.sum: %w", err)
-		}
-		return nil
-	}
-	if err := os.WriteFile(sumPath, sum, 0644); err != nil {
+	if err := os.WriteFile(GoSumPath(goModPath), sum, 0644); err != nil {
 		return fmt.Errorf("error writing go.sum: %w", err)
 	}
 	return nil

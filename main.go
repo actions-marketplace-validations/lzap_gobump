@@ -38,14 +38,14 @@ func main() {
 	if err != nil {
 		Fatal(err.Error(), ERR_PARSE)
 	}
-	originalSum, originalHadSum, err := ReadGoSumSnapshot(Config.GoModSrc)
+	originalSum, err := ReadGoSum(Config.GoModSrc)
 	if err != nil {
 		Fatal(err.Error(), ERR_READ)
 	}
 
 	defer func() {
 		if Config.DryRun {
-			if err := RestoreModuleState(Config.GoModDst, original, originalSum, originalHadSum); err != nil {
+			if err := RestoreModuleState(Config.GoModDst, original, originalSum); err != nil {
 				Fatal(err.Error(), ERR_WRITE)
 			}
 		}
