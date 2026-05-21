@@ -44,25 +44,25 @@ func LogCmdResult(line string, stdout, stderr *bytes.Buffer, err error) {
 
 func RunCmd(name string, args []string, logOutput bool) error {
 	line := Cmdline(name, args)
-	if logOutput && DebugEnabled() {
+	if logOutput {
 		Debug.Println("running:", line)
 	}
 	c := exec.Command(name, args...)
 	c.Env = subprocessEnv(name)
 	var stdout, stderr bytes.Buffer
-	if logOutput && DebugEnabled() {
+	if logOutput && Debug.Enabled() {
 		c.Stdout = &stdout
 		c.Stderr = &stderr
 	}
 	err := c.Run()
-	if logOutput && DebugEnabled() {
+	if logOutput && Debug.Enabled() {
 		LogCmdResult(line, &stdout, &stderr, err)
 	}
 	return err
 }
 
 func RunCmdOutput(name string, args []string, logOutput bool) ([]byte, error) {
-	if !logOutput || !DebugEnabled() {
+	if !logOutput || !Debug.Enabled() {
 		c := exec.Command(name, args...)
 		c.Env = subprocessEnv(name)
 		return c.Output()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -9,17 +10,47 @@ import (
 
 var (
 	Out   *log.Logger
-	Debug *log.Logger
+	Debug *verboseLogger
 	Err   *log.Logger
 )
 
+// verboseLogger writes to w only when Config.Verbose is true.
+type verboseLogger struct {
+	w io.Writer
+}
+
+func newVerboseLogger(w io.Writer) *verboseLogger {
+	return &verboseLogger{w: w}
+}
+
+func (v *verboseLogger) Enabled() bool {
+	return Config != nil && Config.Verbose
+}
+
+func (v *verboseLogger) Print(a ...any) {
+	if !v.Enabled() {
+		return
+	}
+	fmt.Fprint(v.w, a...)
+}
+
+func (v *verboseLogger) Println(a ...any) {
+	if !v.Enabled() {
+		return
+	}
+	fmt.Fprintln(v.w, a...)
+}
+
+func (v *verboseLogger) Printf(format string, a ...any) {
+	if !v.Enabled() {
+		return
+	}
+	fmt.Fprintf(v.w, format, a...)
+}
+
 func InitLoggers() {
 	Err = log.New(os.Stderr, "", 0)
-	if DebugEnabled() {
-		Debug = Err
-	} else {
-		Debug = log.New(io.Discard, "", 0)
-	}
+	Debug = newVerboseLogger(os.Stderr)
 
 	outWriter := io.Writer(os.Stdout)
 	if Config.Format == "none" {
@@ -31,10 +62,6 @@ func InitLoggers() {
 func Fatal(msg string, code int) {
 	Err.Println(msg)
 	os.Exit(code)
-}
-
-func DebugEnabled() bool {
-	return Config != nil && Config.Verbose
 }
 
 func StrOrDash(str string) string {

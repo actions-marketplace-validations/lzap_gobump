@@ -19,9 +19,7 @@ func WithLoggers(t *testing.T, stdout, stderr io.Writer, verbose bool, format st
 	}
 	if stderr != nil {
 		Err = log.New(stderr, "", 0)
-		if verbose {
-			Debug = Err
-		}
+		Debug = newVerboseLogger(stderr)
 	}
 }
 

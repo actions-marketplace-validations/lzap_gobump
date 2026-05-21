@@ -23,9 +23,6 @@ func main() {
 	if err := InitBundledToolchain(); err != nil {
 		Fatal(err.Error(), ERR_CMD)
 	}
-	if DebugEnabled() {
-		Debug.Printf("using bundled toolchain %s for go subprocesses (GOTOOLCHAIN)\n", bundledToolchain)
-	}
 
 	if err := ErrIfUnsafeGitWorktree(); err != nil {
 		Fatal(err.Error(), ERR_GIT)

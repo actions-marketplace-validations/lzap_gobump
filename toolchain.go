@@ -78,11 +78,11 @@ func toolchainLabel(mod *modfile.File) string {
 
 // WarnIgnoredGoModToolchain logs when go.mod contains a toolchain line that gobump does not use.
 func WarnIgnoredGoModToolchain(mod *modfile.File) {
-	if !DebugEnabled() || mod == nil || mod.Toolchain == nil || mod.Toolchain.Name == "" {
+	if mod == nil || mod.Toolchain == nil || mod.Toolchain.Name == "" {
 		return
 	}
 	Debug.Printf(
-		"warning: ignoring toolchain %s in go.mod; subprocesses use bundled %s via GOTOOLCHAIN\n",
+		"warning: ignoring toolchain %s in go.mod; using GOTOOLCHAIN=%s\n",
 		mod.Toolchain.Name,
 		bundledToolchain,
 	)
