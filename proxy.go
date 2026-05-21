@@ -155,7 +155,8 @@ func (p *GoProxy) FetchVersionInfo(modPath, version string) (ModuleVersionInfo, 
 	return info, nil
 }
 
+// discardBody drains the response body to enable connection reuse.
+// The caller is responsible for closing the body (typically via defer).
 func discardBody(resp *http.Response) {
 	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
 }
