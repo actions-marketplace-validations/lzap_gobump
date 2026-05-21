@@ -256,8 +256,9 @@ func PrintChangelogs(results []Result) {
 		}
 
 		if Config.ChangelogDest == "stdout" {
-			Debug.Println("Git Changelogs:")
-			Debug.Print(sb.String())
+			if s := sb.String(); s != "" {
+				Out.Print(s)
+			}
 		} else if Config.ChangelogDest != "" {
 			err := os.WriteFile(Config.ChangelogDest, []byte(sb.String()), 0644)
 			if err != nil {
