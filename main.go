@@ -9,6 +9,11 @@ import (
 func main() {
 	InitConfig()
 
+	if err := PrepareGoModWorkspace(); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(ERR_READ)
+	}
+
 	if Config.Version {
 		if info, ok := debug.ReadBuildInfo(); ok {
 			fmt.Printf("%s %s\n", info.Main.Version, info.Main.Sum)
