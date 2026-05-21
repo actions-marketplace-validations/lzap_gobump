@@ -21,7 +21,7 @@ func ValidateUpgrade(originalMod, newMod *modfile.File) error {
 	if originalMod == nil || newMod == nil || originalMod.Go == nil || newMod.Go == nil {
 		return fmt.Errorf("parsing error")
 	}
-	if strings.TrimSuffix(originalMod.Go.Version, ".0") != strings.TrimSuffix(newMod.Go.Version, ".0") {
+	if normalizeVersion(originalMod.Go.Version) != normalizeVersion(newMod.Go.Version) {
 		return fmt.Errorf("upgrade changes required Go version %s => %s", originalMod.Go.Version, newMod.Go.Version)
 	}
 	if toolchainIdentity(originalMod) != toolchainIdentity(newMod) {

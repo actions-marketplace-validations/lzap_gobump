@@ -61,11 +61,17 @@ func setEnvVar(env []string, key, value string) []string {
 	return out
 }
 
+// normalizeVersion removes trailing ".0" from version strings for comparison.
+// This treats "1.21" and "1.21.0" as equivalent.
+func normalizeVersion(v string) string {
+	return strings.TrimSuffix(v, ".0")
+}
+
 func toolchainIdentity(mod *modfile.File) string {
 	if mod == nil || mod.Toolchain == nil {
 		return ""
 	}
-	return strings.TrimSuffix(mod.Toolchain.Name, ".0")
+	return normalizeVersion(mod.Toolchain.Name)
 }
 
 func toolchainLabel(mod *modfile.File) string {
