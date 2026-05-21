@@ -1,3 +1,11 @@
+// Package main implements gobump, a tool for upgrading Go dependencies
+// while pinning the Go version directive in go.mod.
+//
+// The tool upgrades dependencies one by one, retrying with older versions
+// when constraints fail, and optionally creates per-dependency git commits.
+// It ensures the `go` version statement in go.mod is never touched by running
+// all `go` commands with the bundled Go binary (via GOTOOLCHAIN) and ignoring
+// any `toolchain` line in the project's go.mod.
 package main
 
 import (
