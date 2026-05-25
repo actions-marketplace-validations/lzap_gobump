@@ -250,3 +250,67 @@ func TestGitResetWorktreeClean(t *testing.T) {
 		t.Fatalf("expected clean work tree, got:\n%s", status)
 	}
 }
+
+func TestGitCommitDependencyBumpStagesAllFiles(t *testing.T) {
+	tmp := t.TempDir()
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "init").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "config", "user.email", "t@test").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "config", "user.name", "t").Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	goMod := filepath.Join(tmp, "go.mod")
+	if err := os.WriteFile(goMod, []byte("module example.com/test\n\ngo 1.24.0\n\nrequire example.com/dep v1.0.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "add", "go.mod").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "commit", "-m", "init").Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(goMod, []byte("module example.com/test\n\ngo 1.24.0\n\nrequire example.com/dep v1.1.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vendorFile := filepath.Join(tmp, "vendor", "example.com", "dep", "README")
+	if err := os.MkdirAll(filepath.Dir(vendorFile), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(vendorFile, []byte("vendored\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	Config = &AppConfig{
+		GitUserName:  "t",
+		GitUserEmail: "t@test",
+		GoBinary:     "go",
+	}
+	if err := GitCommitDependencyBump("example.com/dep", "v1.0.0", "v1.1.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	show, err := exec.Command("git", "show", "--name-only", "--pretty=format:", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := strings.TrimSpace(string(show))
+	if !strings.Contains(names, "go.mod") {
+		t.Fatalf("commit should include go.mod, got:\n%s", names)
+	}
+	if !strings.Contains(names, "vendor/") {
+		t.Fatalf("commit should include vendor tree, got:\n%s", names)
+	}
+}

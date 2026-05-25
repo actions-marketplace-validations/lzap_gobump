@@ -1,11 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -62,52 +58,8 @@ func gitOutput(args ...string) ([]byte, error) {
 	return RunCmdOutput("git", args, true)
 }
 
-func goModSumPathsForGit() []string {
-	return []string{goModFile, goSumPath()}
-}
-
 func gitWorktreeDiffersFromHEAD() bool {
-	paths := goModSumPathsForGit()
-	args := append([]string{"diff", "--quiet", "HEAD", "--"}, paths...)
-	err := gitRun(args...)
-	if err == nil {
-		return false
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
-		return true
-	}
-	return false
-}
-
-// gitRelGoModSumPaths returns go.mod and go.sum paths relative to the repository root.
-func gitRelGoModSumPaths() ([]string, error) {
-	paths := goModSumPathsForGit()
-	absPaths := make([]string, 0, len(paths))
-	for _, p := range paths {
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return nil, err
-		}
-		absPaths = append(absPaths, abs)
-	}
-	topBytes, err := gitOutput("rev-parse", "--show-toplevel")
-	if err != nil {
-		return nil, fmt.Errorf("git rev-parse --show-toplevel: %w", err)
-	}
-	top := strings.TrimSpace(string(topBytes))
-	relPaths := make([]string, len(absPaths))
-	for i, ap := range absPaths {
-		rel, err := filepath.Rel(top, ap)
-		if err != nil {
-			return nil, err
-		}
-		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return nil, fmt.Errorf("go.mod path %s is outside git top-level %s", ap, top)
-		}
-		relPaths[i] = filepath.ToSlash(rel)
-	}
-	return relPaths, nil
+	return gitHasUncommittedChanges()
 }
 
 // gitResetWorktreeClean restores the work tree to HEAD, discarding all tracked
@@ -147,18 +99,8 @@ func GitCommitDependencyBump(modulePath, versionBefore, versionAfter string) err
 	if err := goModTidy(); err != nil {
 		return err
 	}
-	for _, p := range goModSumPathsForGit() {
-		if _, err := os.Stat(p); err != nil {
-			return fmt.Errorf("git add: %w", err)
-		}
-	}
-	relPaths, err := gitRelGoModSumPaths()
-	if err != nil {
-		return err
-	}
-	addArgs := append([]string{"add", "--"}, relPaths...)
-	if err := gitRun(addArgs...); err != nil {
-		return fmt.Errorf("git add: %w", err)
+	if err := gitRun("add", "-A"); err != nil {
+		return fmt.Errorf("git add -A: %w", err)
 	}
 	msg := fmt.Sprintf("chore(deps): update %s to %s", modulePath, versionAfter)
 	if Config.Changelog {
