@@ -110,15 +110,15 @@ func gitRelGoModSumPaths() ([]string, error) {
 	return relPaths, nil
 }
 
-// gitDiscardGoModSumChanges restores go.mod and go.sum to the last commit without touching other files.
-func gitDiscardGoModSumChanges() error {
-	relPaths, err := gitRelGoModSumPaths()
-	if err != nil {
-		return err
+// gitResetWorktreeClean restores the work tree to HEAD, discarding all tracked
+// changes and removing untracked and ignored files (e.g. vendor/ from go mod vendor).
+// Only call when the tree was verified clean at start (ErrIfUnsafeGitWorktree).
+func gitResetWorktreeClean() error {
+	if err := gitRun("reset", "--hard", "HEAD"); err != nil {
+		return fmt.Errorf("git reset --hard HEAD: %w", err)
 	}
-	args := append([]string{"checkout", "HEAD", "--"}, relPaths...)
-	if err := gitRun(args...); err != nil {
-		return fmt.Errorf("git checkout HEAD -- go.mod/go.sum: %w", err)
+	if err := gitRun("clean", "-fdx"); err != nil {
+		return fmt.Errorf("git clean -fdx: %w", err)
 	}
 	return nil
 }

@@ -175,3 +175,78 @@ func TestErrIfUnsafeGitWorktree(t *testing.T) {
 		t.Fatalf("expected nil with dry-run: %v", err)
 	}
 }
+
+func TestGitResetWorktreeClean(t *testing.T) {
+	tmp := t.TempDir()
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "init").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "config", "user.email", "t@test").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "config", "user.name", "t").Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	readme := filepath.Join(tmp, "README")
+	if err := os.WriteFile(readme, []byte("tracked\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".gitignore"), []byte("vendor/\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "add", "README", ".gitignore").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "commit", "-m", "init").Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(readme, []byte("dirty\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vendor := filepath.Join(tmp, "vendor", "leftover")
+	if err := os.MkdirAll(filepath.Dir(vendor), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(vendor, []byte("vendored\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	untracked := filepath.Join(tmp, "scratch.txt")
+	if err := os.WriteFile(untracked, []byte("tmp\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := gitResetWorktreeClean(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "tracked\n" {
+		t.Fatalf("README = %q, want tracked state restored", got)
+	}
+	if _, err := os.Stat(vendor); !os.IsNotExist(err) {
+		t.Fatal("expected ignored vendor/ tree to be removed")
+	}
+	if _, err := os.Stat(untracked); !os.IsNotExist(err) {
+		t.Fatal("expected untracked file to be removed")
+	}
+	status, err := exec.Command("git", "status", "--porcelain").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(status)) != "" {
+		t.Fatalf("expected clean work tree, got:\n%s", status)
+	}
+}

@@ -41,7 +41,7 @@ func ValidateUpgrade(originalMod, newMod *modfile.File) error {
 }
 
 // UpgradeModule attempts to upgrade a single module.
-func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) upgradeResult {
+func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File, perDepGit bool) upgradeResult {
 	Debug.Println("bump module", r.Mod.Path, "from", r.Mod.Version)
 
 	versions, err := proxy.FetchVersions(r.Mod.Path, r.Mod.Version)
@@ -89,7 +89,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) upgr
 
 		Debug.Println("compare go directive:", okMod.Go.Version, "=>", newMod.Go.Version)
 
-		if !runCommands(okMod, sumSnap) {
+		if !runCommands(okMod, sumSnap, perDepGit) {
 			continue
 		}
 
@@ -101,7 +101,7 @@ func UpgradeModule(proxy *GoProxy, r *modfile.Require, okMod *modfile.File) upgr
 	return upgradeResult{Mod: okMod}
 }
 
-func runCommands(revertTo *modfile.File, sumSnap []byte) bool {
+func runCommands(revertTo *modfile.File, sumSnap []byte, perDepGit bool) bool {
 	for _, c := range Config.Commands {
 		if c == "" {
 			continue
@@ -111,6 +111,12 @@ func runCommands(revertTo *modfile.File, sumSnap []byte) bool {
 			Debug.Println("exec failed, reverting go.mod and go.sum")
 			if err := RestoreModuleState(revertTo, sumSnap); err != nil {
 				Debug.Println("failed to revert module state:", err.Error())
+			}
+			if perDepGit {
+				Debug.Println("git reset worktree after failed -exec")
+				if err := gitResetWorktreeClean(); err != nil {
+					Debug.Println("git reset worktree failed:", err.Error())
+				}
 			}
 			return false
 		}
@@ -185,9 +191,9 @@ func extractVersionAfter(mod *modfile.File, modulePath, fallback string) string 
 // Returns the final success status and version after git operations.
 func handleGitIntegration(result upgradeResult, modulePath, versionBefore, versionAfter string) (bool, string) {
 	if !result.Success {
-		Debug.Println("git discard go.mod/go.sum after failed bump for", modulePath)
-		if err := gitDiscardGoModSumChanges(); err != nil {
-			Err.Println("git discard go.mod/go.sum failed:", err.Error())
+		Debug.Println("git reset worktree after failed bump for", modulePath)
+		if err := gitResetWorktreeClean(); err != nil {
+			Err.Println("git reset worktree failed:", err.Error())
 		}
 		return false, versionBefore
 	}
@@ -199,8 +205,8 @@ func handleGitIntegration(result upgradeResult, modulePath, versionBefore, versi
 	Debug.Println("git commit bump for", modulePath, versionBefore, "->", versionAfter)
 	if err := GitCommitDependencyBump(modulePath, versionBefore, versionAfter); err != nil {
 		Err.Println("git commit failed:", err.Error())
-		if err := gitDiscardGoModSumChanges(); err != nil {
-			Err.Println("git discard go.mod/go.sum failed:", err.Error())
+		if err := gitResetWorktreeClean(); err != nil {
+			Err.Println("git reset worktree failed:", err.Error())
 		}
 		return false, versionBefore
 	}
@@ -242,7 +248,7 @@ func Process(original *modfile.File) []Result {
 			continue
 		}
 
-		result := UpgradeModule(proxy, r, okMod)
+		result := UpgradeModule(proxy, r, okMod, perDepGit)
 		versionAfter := extractVersionAfter(result.Mod, r.Mod.Path, r.Mod.Version)
 		success := result.Success
 
