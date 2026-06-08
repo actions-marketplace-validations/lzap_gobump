@@ -2,8 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
@@ -11,17 +15,61 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-type GoProxy struct {
-	baseURL string
+func NewHTTPClient() *http.Client {
+	return &http.Client{Timeout: HTTPClientTimeout}
 }
 
-func NewGoProxy(baseURL string) *GoProxy {
-	if baseURL == "" {
-		baseURL = "https://proxy.golang.org"
-	}
+func setDefaultHTTPHeaders(req *http.Request) {
+	req.Header.Set("User-Agent", HTTPUserAgent)
+}
 
-	baseURL = strings.TrimSuffix(baseURL, "/")
-	return &GoProxy{baseURL: baseURL}
+type moduleVersionOrigin struct {
+	VCS  string `json:"VCS"`
+	URL  string `json:"URL"`
+	Hash string `json:"Hash"`
+	Ref  string `json:"Ref"`
+}
+
+// ModuleVersionInfo is the JSON body of a module proxy @v/VERSION.info response.
+type ModuleVersionInfo struct {
+	Version string              `json:"Version"`
+	Time    string              `json:"Time"`
+	Origin  moduleVersionOrigin `json:"Origin"`
+}
+
+type GoProxy struct {
+	baseURL string
+	client  *http.Client
+}
+
+func moduleProxyBaseURL(explicit string) string {
+	explicit = strings.TrimSpace(explicit)
+	if explicit != "" {
+		return strings.TrimSuffix(explicit, "/")
+	}
+	gp := strings.TrimSpace(os.Getenv("GOPROXY"))
+	if gp == "" {
+		return "https://proxy.golang.org"
+	}
+	for _, p := range strings.Split(gp, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" || p == "direct" || p == "off" {
+			continue
+		}
+		if strings.HasPrefix(p, "file://") {
+			continue
+		}
+		return strings.TrimSuffix(p, "/")
+	}
+	return "https://proxy.golang.org"
+}
+
+func newGoProxy(configured string) *GoProxy {
+	base := moduleProxyBaseURL(configured)
+	return &GoProxy{
+		baseURL: base,
+		client:  NewHTTPClient(),
+	}
 }
 
 func isPreRelease(version string) bool {
@@ -39,7 +87,14 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 		return nil, fmt.Errorf("failed to escape module path: %w", err)
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%s/%s/@v/list", p.baseURL, modName))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+		fmt.Sprintf("%s/%s/@v/list", p.baseURL, modName), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %w", err)
+	}
+	setDefaultHTTPHeaders(req)
+
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch versions: %w", err)
 	}
@@ -79,4 +134,37 @@ func (p *GoProxy) FetchVersions(modName string, version string) ([]module.Versio
 	slices.Reverse(versions)
 
 	return versions, nil
+}
+
+// FetchVersionInfo returns proxy metadata for a single module version.
+func (p *GoProxy) FetchVersionInfo(modPath, version string) (ModuleVersionInfo, error) {
+	var info ModuleVersionInfo
+	escaped, err := module.EscapePath(modPath)
+	if err != nil {
+		return info, fmt.Errorf("failed to escape module path: %w", err)
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+		fmt.Sprintf("%s/%s/@v/%s.info", p.baseURL, escaped, version), nil)
+	if err != nil {
+		return info, fmt.Errorf("failed to build request: %w", err)
+	}
+	setDefaultHTTPHeaders(req)
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return info, fmt.Errorf("failed to fetch version info: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return info, fmt.Errorf("failed to fetch version info: %s", resp.Status)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return info, fmt.Errorf("failed to decode version info: %w", err)
+	}
+	return info, nil
+}
+
+// discardBody drains the response body to enable connection reuse.
+// The caller is responsible for closing the body (typically via defer).
+func discardBody(resp *http.Response) {
+	io.Copy(io.Discard, resp.Body)
 }

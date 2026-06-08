@@ -1,3 +1,11 @@
+// Package main implements gobump, a tool for upgrading Go dependencies
+// while pinning the Go version directive in go.mod.
+//
+// The tool upgrades dependencies one by one, retrying with older versions
+// when constraints fail, and optionally creates per-dependency git commits.
+// It ensures the `go` version statement in go.mod is never touched by running
+// all `go` commands with the bundled Go binary (via GOTOOLCHAIN) and ignoring
+// any `toolchain` line in the project's go.mod.
 package main
 
 import (
@@ -6,14 +14,10 @@ import (
 	"runtime/debug"
 )
 
-var (
-	out Output
-)
-
 func main() {
 	InitConfig()
 
-	if config.Version {
+	if Config.Version {
 		if info, ok := debug.ReadBuildInfo(); ok {
 			fmt.Printf("%s %s\n", info.Main.Version, info.Main.Sum)
 			os.Exit(0)
@@ -22,35 +26,46 @@ func main() {
 		os.Exit(0)
 	}
 
-	switch config.Format {
-	case "markdown":
-		out = NewOutputMarkdown(os.Stdout)
-	case "console":
-		out = &OutputConsole{}
-	default:
-		out = &OutputNone{}
+	InitLoggers()
+
+	if err := initBundledToolchain(); err != nil {
+		Fatal(err.Error(), ERR_CMD)
 	}
 
-	out.Begin()
-	defer out.End()
+	if err := ErrIfUnsafeGitWorktree(); err != nil {
+		Fatal(err.Error(), ERR_GIT)
+	}
 
-	original, err := parseMod(config.GoModSrc)
+	if Config.Format == "markdown" {
+		printMarkdownHeader()
+		defer printMarkdownFooter()
+	}
+
+	original, err := ParseMod(goModFile)
 	if err != nil {
-		out.Fatal(err.Error(), ERR_PARSE)
+		Fatal(err.Error(), ERR_PARSE)
+	}
+	warnIgnoredGoModToolchain(original)
+	originalSum, err := ReadGoSum()
+	if err != nil {
+		Fatal(err.Error(), ERR_READ)
 	}
 
 	defer func() {
-		if config.DryRun {
-			if err := saveMod(config.GoModDst, original); err != nil {
-				out.Fatal(err.Error(), ERR_WRITE)
+		if Config.DryRun {
+			if err := RestoreModuleState(original, originalSum); err != nil {
+				Fatal(err.Error(), ERR_WRITE)
 			}
 		}
 	}()
 
-	results := process(original)
+	results := Process(original)
 
-	out.PrintSummary(results)
-	if config.Changelog {
+	PrintResults(results)
+	if Config.Changelog && !PerDependencyGitEnabled() {
 		PrintChangelogs(results)
+	}
+	if Config.FailOnError && ResultsHaveErrors(results) {
+		os.Exit(1)
 	}
 }

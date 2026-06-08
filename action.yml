@@ -13,7 +13,7 @@ inputs:
     required: false
     default: "0"
   token:
-    description: "GitHub token with permissions to push branches and open PRs"
+    description: "GitHub token with permissions to push branches and open PRs; also used for optional changelog Gist (GITHUB_TOKEN / GH_TOKEN in the step environment)"
     required: true
   exec:
     description: "String to pass via gobump -exec argument (no shell expansion)"
@@ -25,16 +25,18 @@ inputs:
     description: "Comma-separated list of labels to add to the PR"
     required: false
   tidy:
-    description: "Run go mod tidy after bumping dependencies (default: true)"
+    description: "Deprecated, ignored. gobump runs go mod tidy before each per-dependency commit (git mode) or leaves go.mod/go.sum as updated (no-git mode)."
     required: false
     default: "true"
+    deprecationMessage: "tidy is deprecated and has no effect; remove it from your workflow."
+  exec_pr:
+    description: "Deprecated, ignored. Previously ran a command before the PR step and appended output to the commit message."
+    required: false
+    deprecationMessage: "exec_pr is deprecated and has no effect; remove it from your workflow."
   setup_go:
     description: "Set up Go environment (default: true)"
     required: false
     default: "true"
-  exec_pr:
-    description: "Command to execute before PR is made (bash shell)"
-    required: false
   pr:
     description: "Create a pull request with the changes"
     required: false
@@ -44,7 +46,7 @@ inputs:
     required: false
     default: "false"
   changelog:
-    description: "Add changelog of all updated modules to commit message"
+    description: "Fetch upstream git changelogs for updated modules. With per-dependency commits (default), each bump commit includes its module changelog; with -no-git, changelogs are written to changelog-dest for the PR message instead"
     required: false
     default: "false"
   include:
@@ -57,13 +59,25 @@ inputs:
     description: "Commit message for the PR other than 'chore: bump dependencies via gobump'"
     required: false
     default: "chore: bump dependencies via gobump"
+  no_git:
+    description: "If true, skip all gobump git operations (no per-dependency commits or reset/clean on failure). When false (default), each successful bump may be committed as chore(deps): update … when the work tree has no uncommitted changes."
+    required: false
+    default: "false"
+  user_name:
+    description: "Git user.name for per-dependency commits (passed to gobump -user-name)"
+    required: false
+    default: "Schutzbot"
+  user_email:
+    description: "Git user.email for per-dependency commits (passed to gobump -user-email)"
+    required: false
+    default: "schutzbot@gmail.com"
 
 runs:
   using: "composite"
   steps:
     - name: Set up Go environment
       if: ${{ inputs.setup_go == 'true' }}
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ inputs.go_version }}
         cache: 'true'
@@ -73,21 +87,21 @@ runs:
       if: ${{ inputs.development == 'false' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
+        GITHUB_TOKEN: ${{ inputs.token }}
       run: |
+        export GOTOOLCHAIN="$(go env GOVERSION)"
         go version
         go env
-        GIST_TOKEN="${{ inputs.token }}"
-        go run github.com/lzap/gobump@latest -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" ${{ inputs.include }} | tee /tmp/bump.log
+        go run github.com/lzap/gobump@latest -no-git=${{ inputs.no_git }} -user-name="${{ inputs.user_name }}" -user-email="${{ inputs.user_email }}" -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" ${{ inputs.include }} | tee /tmp/bump.log
 
     - name: Prepare development environment
       if: ${{ inputs.development == 'true' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
       run: |
+        export GOTOOLCHAIN="$(go env GOVERSION)"
         go version
         go env
         go get -v ./...
@@ -96,51 +110,65 @@ runs:
       if: ${{ inputs.development == 'true' }}
       shell: bash
       env:
-        GOTOOLCHAIN: local
         CGO_ENABLED: ${{ inputs.cgo_enabled }}
+        GITHUB_TOKEN: ${{ inputs.token }}
       run: |
-        GIST_TOKEN="${{ inputs.token }}"
-        go run . -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" | tee /tmp/bump.log
+        export GOTOOLCHAIN="$(go env GOVERSION)"
+        go version
+        go env
+        go run . -no-git=${{ inputs.no_git }} -user-name="${{ inputs.user_name }}" -user-email="${{ inputs.user_email }}" -exec "${{ inputs.exec }}" -exec "${{ inputs.exec2 }}" -changelog=${{ inputs.changelog }} -changelog-dest="/tmp/changelog.txt" -exclude "${{ inputs.exclude }}" ${{ inputs.include }} | tee /tmp/bump.log
 
-    - name: Run go mod tidy
-      if: ${{ inputs.tidy == 'true' }}
+    - name: Deprecation warnings
+      if: ${{ inputs.tidy != 'true' || inputs.exec_pr != '' }}
       shell: bash
-      env:
-        GOTOOLCHAIN: local
-        CGO_ENABLED: ${{ inputs.cgo_enabled }}
       run: |
-        go mod tidy
-
-    - name: Execute command before PR
-      env:
-        GOTOOLCHAIN: local
-        CGO_ENABLED: ${{ inputs.cgo_enabled }}
-      shell: bash
-      if: ${{ inputs.exec_pr != '' }}
-      run: ${{ inputs.exec_pr }}
+        if [[ "${{ inputs.tidy }}" != "true" ]]; then
+          echo "::warning title=Deprecated input tidy::tidy is ignored (gobump handles go mod tidy). Remove tidy from your workflow."
+        fi
+        if [[ -n "${{ inputs.exec_pr }}" ]]; then
+          echo "::warning title=Deprecated input exec_pr::exec_pr is ignored. Remove exec_pr from your workflow."
+        fi
 
     - name: Prepare commit message
       id: prep_commit_msg
       shell: bash
       run: |
         if [[ -f /tmp/changelog.txt ]]; then
-          CHANGELOG=$(cat /tmp/changelog.txt)
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ inputs.commit_message }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "commit_message<<COMMIT_MSG_EOF"
+            echo "${{ inputs.commit_message }}"
+            echo ""
+            cat /tmp/changelog.txt
+            echo "COMMIT_MSG_EOF"
+          } >> "$GITHUB_OUTPUT"
         else
-          echo "commit_message=${{ inputs.commit_message }}" >> $GITHUB_OUTPUT
+          echo "commit_message=${{ inputs.commit_message }}" >> "$GITHUB_OUTPUT"
         fi
+
+    - name: Prepare unique branch name
+      id: unique_branch
+      if: ${{ inputs.pr == 'true' }}
+      shell: bash
+      run: |
+        echo "branch=$(date -u +gobump-%Y-%m-%d-%H%M%S%N)" >> "$GITHUB_OUTPUT"
+
+    - name: Log commits and git status before PR
+      if: ${{ inputs.pr == 'true' }}
+      shell: bash
+      run: |
+        echo "=== Commits added by gobump ==="
+        git log --oneline --decorate --graph origin/${{ github.ref_name }}..${{ github.ref_name }} || echo "No new commits"
+        echo ""
+        echo "=== Git status (uncommitted files) ==="
+        git status --short --untracked-files=all
 
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v7
       if: ${{ inputs.pr == 'true' }}
       with:
         token: ${{ inputs.token }}
-        branch: "gobump-deps-${{ github.run_id }}"
+        branch: ${{ steps.unique_branch.outputs.branch }}
         commit-message: "${{ steps.prep_commit_msg.outputs.commit_message }}"
-        title: "chore: bump dependencies via gobump"
+        title: "${{ inputs.commit_message }}"
         body-path: /tmp/bump.log
         labels: ${{ inputs.labels }}

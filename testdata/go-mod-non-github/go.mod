@@ -8,6 +8,7 @@ require (
 	github.com/onsi/gomega v1.34.1
 	github.com/sirupsen/logrus v1.9.3
 	go.uber.org/zap v1.27.0
+	golang.org/x/sys v0.28.0
 )
 
 require (
@@ -23,7 +24,6 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

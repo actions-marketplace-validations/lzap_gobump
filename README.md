@@ -2,7 +2,7 @@
 
 Pins Go version when bumping dependencies.
 
-A simple tool that upgrades all direct dependencies one by one, ensuring the Go version statement in `go.mod` is never touched. This is useful if your build infrastructure lags behind the latest Go version and you are unable to upgrade, for example, when using Go from Linux distribution packages or a container runtime like the Red Hat Go Toolset for UBI.
+A simple tool that upgrades all direct dependencies one by one, ensuring the `go` version statement in `go.mod` is never touched. It runs all `go` commands with the bundled Go binary (via `GOTOOLCHAIN`) and does not honor a `toolchain` line in the project's `go.mod`. This is useful if your build infrastructure lags behind the latest Go version and you are unable to upgrade, for example, when using Go from Linux distribution packages or a container runtime like the Red Hat Go Toolset for UBI.
 
 ## The problem
 
@@ -48,38 +48,63 @@ When a dependency cannot be upgraded (or optional commands fail to execute, e.g.
 go install github.com/lzap/gobump@latest
 ```
 
+This repository’s `go.mod` targets a recent Go release; use a `gobump` binary built with a Go toolchain that matches your environment if you need to run the tool itself on an older Go version.
+
 ## Usage
 
 ```
   -changelog
-    	print git changelog of all updated modules (default true)
-  -changelog-gist string
-    	GitHub token to create a Gist with the changelog
+    	fetch upstream git changelog for each updated module (embedded in per-dependency commit messages when git integration is enabled; otherwise aggregated at end per -changelog-dest)
+  -changelog-dest string
+    	with -changelog and -no-git (or no usable git work tree): write aggregated changelogs to stdout (default), a file path, or "gist"; ignored when changelogs are committed per dependency (default "stdout")
   -dry-run
-    	revert to original go.mod after running
-  -dst-go-mod string
-    	path to go.mod destination file (default: go.mod) (default "go.mod")
+    	revert to original go.mod and go.sum after running
+  -exclude value
+    	comma-separated list of modules to exclude from update
   -exec value
     	exec command for each individual bump, can be used multiple times
-  -exclude string
-    	comma-separated list of modules to exclude from update
+  -fail-on-error
+    	exit with status 1 if any non-excluded module failed to update
   -format string
     	output format (console, markdown, none) (default "console")
+  -proxy string
+    	module proxy base URL (default: first usable $GOPROXY entry, else https://proxy.golang.org)
   -retries int
     	number of downgrade retries for each module (default: 5) (default 5)
-  -src-go-mod string
-    	path to go.mod source file (default: go.mod) (default "go.mod")
+  -no-git
+    	if true, skip all git operations (no per-dependency commits or reset/clean on failure)
+  -user-email string
+    	git user.email for per-dependency commits (local repo config) (default "schutzbot@gmail.com")
+  -user-name string
+    	git user.name for per-dependency commits (local repo config) (default "Schutzbot")
   -verbose
     	print more information including stderr of executed commands
+  -version
+    	print gobump version and module checksum
 ```
+
+With `-changelog`, upstream commits between the old and new module versions are fetched (via the module proxy and GitHub). By default, each successful bump commit includes that module’s changelog in the message body. Use `-no-git` if you prefer a single aggregated changelog at the end instead.
+
+`-changelog-dest` only applies together with `-changelog` when per-dependency git commits are **not** used (`-no-git`, `-dry-run`, or no clean git work tree):
+
+* `stdout` (default) — print the aggregated changelogs after the summary
+* a file path — write the aggregated changelogs to that file (the GitHub Action uses `/tmp/changelog.txt` this way when `no_git` is true)
+* `gist` — create one private GitHub Gist with all changelogs; the URL is printed (requires `GITHUB_TOKEN` or `GH_TOKEN`; never pass a token on the command line)
 
 The utility can also take one or more module paths as positional arguments. When provided, only those dependencies will be updated, ignoring others. This is useful for targeting specific dependency updates.
 
-When no arguments are provided, `gobump` updates all direct dependencies. In this mode, it is important to always specify the `GOTOOLCHAIN` variable to match the version in your project's `go.mod` file. This is the version you want to pin and prevent from being upgraded.
+When no arguments are provided, `gobump` updates all direct dependencies. Run it with the Go toolchain you intend to use (for example the Red Hat Go Toolset or a specific `go` on `PATH`). Gobump sets `GOTOOLCHAIN` from that binary's `go env GOVERSION` for every `go` subprocess, ignoring any `toolchain` line in the project's `go.mod`. With `-verbose`, a warning is printed when such a `toolchain` line is present.
 
 ```
-GOTOOLCHAIN=go1.22.0 gobump
+go1.22.0 get github.com/lzap/gobump@latest
+go1.22.0 gobump
 ```
+
+Or set `GOVERSION=go1.22.0` so the `go` command resolves to that binary.
+
+By default, the module version list is fetched from the first usable URL in `GOPROXY` (same as the `go` command), or from `https://proxy.golang.org` when that is unset or only `direct`/`off` is configured. Override with `-proxy` if needed.
+
+For automation (for example CI), use `-fail-on-error` so the process exits with status 1 when any dependency that was attempted ends in `err` in the summary (excluded modules do not affect the exit code).
 
 Example output:
 
@@ -100,14 +125,15 @@ golang.org/x/term err
 
 Summary legend:
 
-* `keep`: version is kept (no update available)
-* `update`: module updated to newer version
-* `err`: there was an error during the update; either the required Go version is too high, one of the `exec` commands failed, or another error occurred
+* `keep`: current version is already the best candidate tried from the proxy list (or upgrade left the version unchanged)
+* `noop`: the module proxy returned no newer versions than the one in `go.mod`, so no `go get` was run
+* `update`: module updated to a newer version
+* `err`: there was an error during the update; either the required Go version is too high, one of the `exec` commands failed, fetching the version list failed, or another error occurred
 * `excluded`: module was excluded from update
 
 ## GitHub Action
 
-The GitHub Action executes `gobump`, then performs `go mod tidy` and files an update PR to the project. Example PR: https://github.com/lzap/gobump/pull/7
+The GitHub Action executes `gobump` and opens an update PR. Example PR: https://github.com/lzap/gobump/pull/7
 
 Example action:
 
@@ -139,33 +165,36 @@ Action inputs:
 * `exec`: An optional command to execute for each dependency update.
 * `exec2`: A second optional command to execute for each dependency update.
 * `exclude`: A comma-separated list of modules to exclude from the update.
-* `tidy`: Set to `false` to avoid executing `go mod tidy` after `gobump`.
-* `exec_pr`: An optional command to execute before a PR is made.
+* `tidy` *(deprecated, ignored)*: Kept for backward compatibility. gobump runs `go mod tidy` before each per-dependency commit in git mode.
+* `exec_pr` *(deprecated, ignored)*: Kept for backward compatibility. No longer runs a command before the PR step.
 * `pr`: Set to `false` to avoid the creation of a PR.
-* `token`: The GitHub token.
+* `token`: The GitHub token (used for pull requests and, when changelog is enabled with `gist` output, for creating the Gist; the tool reads `GITHUB_TOKEN` or `GH_TOKEN`).
 * `labels`: Comma-separated GitHub PR labels.
+* `no_git`: When `true`, passes `-no-git` so gobump does not run any git commands (per-dependency commits or reset/clean).
+* `user_name` / `user_email`: Git author identity for per-dependency commits (defaults: `Schutzbot` / `schutzbot@gmail.com`). CI runners often have no global `user.name` / `user.email`; gobump sets these in the local repository before each commit.
 
 Tip: When building or testing in a container, use `-buildvcs=false` to avoid `git: detected dubious ownership in repository` permissions errors. Alternatively, set the `git config --system --add safe.directory /path` config option.
 
 ## How it works
 
 * Loads the project's `go.mod` and stores it in memory.
-* For each direct dependency, it performs `go get -u DEPENDENCY@V`, where `V` is one of the 5 latest versions reported by [proxy.golang.org](https://proxy.golang.org/github.com/lzap/gobump/@v/list).
-* If the `go get` command fails (e.g., `GOTOOLCHAIN` is set) or modifies the Go version in `go.mod`, it reverts to the last version of `go.mod` and tries again with a lower version up to N times (configurable, defaults to 5).
-* If and only if a module succeeds in updating and one or more optional `exec` arguments are passed, it executes them. If any of the commands fail, it reverts to the last `go.mod` version.
+* For each direct dependency, it asks the configured module proxy for `@v/list`, then runs `go get MODULE@V` for up to `-retries` newer versions (newest first). This is not the same as `go get MODULE@latest` in one shot, but it walks backward through recent releases when an upgrade fails.
+* All `go` subprocesses use `GOTOOLCHAIN` from the bundled `go` binary (`go env GOVERSION`); the project's `toolchain` line in `go.mod` is not used (see `-verbose` for a warning when it is set).
+* If the `go get` command fails or modifies the `go` or `toolchain` lines in `go.mod`, it reverts `go.mod` and `go.sum` and tries again with the next lower version until it succeeds or runs out of attempts.
+* In a git repository, unless `-no-git` or `-dry-run` is set, gobump exits before doing any work if there are uncommitted changes (`git status --porcelain` is non-empty), so local edits are not mixed with automatic commits or `git reset --hard` / `git clean -fdx` on failed bumps. After a failed bump or failed `-exec`, gobump restores the work tree to the last commit and removes untracked and ignored files (for example `vendor/` from `go mod vendor`). Use `-no-git` when you intentionally want only `go.mod` / `go.sum` updates with no git integration.
+* When per-dependency git commits are enabled, each successful bump runs `go mod tidy`, then `git add -A` and commits all staged changes as `chore(deps): update MODULE to VERSION` (including files produced by `-exec`, such as `vendor/`). With `-changelog`, the upstream git changelog for that module is appended to the commit message body (`-changelog-dest` is not used in this mode).
+* If and only if a module succeeds in updating to a newer version and one or more optional `exec` arguments are passed, it executes them for that candidate. If the proxy had no newer versions, `exec` is skipped for that module. If any `exec` fails, it reverts to the last good `go.mod` and tries the next older candidate version, up to the retry limit. The same applies when `go get` fails or the `go` / `toolchain` directives would change.
 * Repeats for every other direct dependency.
-
-It is recommended to set `GOTOOLCHAIN` to an explicit Go version to speed up the failure of `go get` because, with a specific Go version, it immediately fails and does not even attempt to download and install packages, which would lead to a `go.mod` change.
 
 ## Custom commands
 
-For every updated dependency, it is possible to run one or more commands to ensure the project builds or tests are passing. Use the `-exec` option multiple times to do that. When such a command returns a non-zero value, it is considered a failure, and that update is rolled back.
+For every updated dependency, it is possible to run one or more commands to ensure the project builds or tests are passing. Use the `-exec` option multiple times to do that. When such a command returns a non-zero value, that candidate version is rolled back and an older version is tried, up to `-retries` times (same as when `go get` fails).
 
 ```
 gobump -exec "go build ./..." -exec "go test ./..."
 ```
 
-Commands are not executed via a shell. Subprocesses will inherit the `GOTOOLCHAIN` setting, so it is fine to use just the `go` command or any version of Go later than 1.21, and it will pick up the correct toolchain.
+Commands are not executed via a shell. `go` commands in `-exec` receive the same bundled `GOTOOLCHAIN` as `go get` and `go mod tidy`.
 
 ## Ambiguous imports
 
@@ -187,11 +216,15 @@ go get google.golang.org/grpc/stats/opentelemetry@none
 
 ## Configuration
 
-It is possible to use a different binary than `go`; set the `GOVERSION=go1.21.0` environment variable to use a different Go version that is available through the `PATH`. But the recommended way of using specific Go tooling is via the `GOTOOLCHAIN` variable.
+It is possible to use a different binary than `go`; set the `GOVERSION=go1.21.0` environment variable to use a different Go version on `PATH`. Gobump derives `GOTOOLCHAIN` from that binary and does not read the project's `toolchain` line in `go.mod`.
 
 ## Limitations
 
-When a module's `latest` version cannot be upgraded, the tool currently does not attempt to lower its version and find the latest that works. This is a feature that will be implemented later.
+`gobump` only considers versions returned by the module proxy’s version list (subject to `-retries`). It does not perform an exhaustive search of the module graph beyond that list, and it does not intentionally downgrade a module to an older major line to satisfy constraints (that remains manual).
+
+## Testing
+
+Integration tests under `main_test.go` run `-dry-run` inside each `testdata/<case>/` directory, which contains a self-contained `go.mod` and `go.sum`. The repository root module is not modified.
 
 ## Discussion
 

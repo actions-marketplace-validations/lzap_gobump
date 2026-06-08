@@ -7,26 +7,34 @@ import (
 	"strings"
 )
 
-type commaSeparatedStringSlice []string
+type CommaSeparatedStringSlice []string
 
-func (i *commaSeparatedStringSlice) String() string {
+func (i *CommaSeparatedStringSlice) String() string {
 	return strings.Join(*i, ",")
 }
 
-func (i *commaSeparatedStringSlice) Set(value string) error {
+func (i *CommaSeparatedStringSlice) Set(value string) error {
 	if value != "" {
-		*i = strings.Split(value, ",")
+		parts := strings.Split(value, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		*i = out
 	}
 	return nil
 }
 
-type stringSlice []string
+type StringSlice []string
 
-func (i *stringSlice) String() string {
+func (i *StringSlice) String() string {
 	return fmt.Sprintf("%v", *i)
 }
 
-func (i *stringSlice) Set(value string) error {
+func (i *StringSlice) Set(value string) error {
 	*i = append(*i, value)
 	return nil
 }
@@ -37,18 +45,21 @@ type AppConfig struct {
 	DryRun        bool
 	Verbose       bool
 	Format        string
-	GoModSrc      string
-	GoModDst      string
 	Retries       int
-	Commands      stringSlice
+	Commands      StringSlice
 	GoBinary      string
 	Changelog     bool
 	ChangelogDest string
 	Dependencies  []string
-	Exclude       commaSeparatedStringSlice
+	Exclude       CommaSeparatedStringSlice
+	NoGit         bool
+	GitUserName   string
+	GitUserEmail  string
+	ModuleProxy   string
+	FailOnError   bool
 }
 
-var config *AppConfig
+var Config *AppConfig
 
 func isCI() bool {
 	return os.Getenv("GITHUB_ACTIONS")+os.Getenv("GITLAB_CI")+os.Getenv("CIRCLECI") != ""
@@ -56,13 +67,13 @@ func isCI() bool {
 
 // InitConfig initializes the global configuration object.
 func InitConfig() {
-	config = &AppConfig{}
+	Config = &AppConfig{}
 
 	goBinary := os.Getenv("GOVERSION")
 	if goBinary == "" {
 		goBinary = "go"
 	}
-	config.GoBinary = goBinary
+	Config.GoBinary = goBinary
 
 	defaultFormat := "console"
 	defaultVerbose := false
@@ -71,22 +82,25 @@ func InitConfig() {
 		defaultVerbose = true
 	}
 
-	var commands stringSlice
-	var exclude commaSeparatedStringSlice
-	flag.BoolVar(&config.Version, "version", false, "print Go binary debug info")
-	flag.BoolVar(&config.DryRun, "dry-run", false, "revert to original go.mod after running")
-	flag.BoolVar(&config.Verbose, "verbose", defaultVerbose, "print more information including stderr of executed commands")
+	var commands StringSlice
+	var exclude CommaSeparatedStringSlice
+	flag.BoolVar(&Config.Version, "version", false, "print gobump version and module checksum")
+	flag.BoolVar(&Config.DryRun, "dry-run", false, "revert to original go.mod and go.sum after running")
+	flag.BoolVar(&Config.Verbose, "verbose", defaultVerbose, "log go get, -exec, and git commands (command line, stdout, stderr, exit code) to stderr")
 	flag.Var(&commands, "exec", "exec command for each individual bump, can be used multiple times")
 	flag.Var(&exclude, "exclude", "comma-separated list of modules to exclude from update")
-	flag.StringVar(&config.Format, "format", defaultFormat, "output format (console, markdown, none)")
-	flag.StringVar(&config.GoModSrc, "src-go-mod", "go.mod", "path to go.mod source file (default: go.mod)")
-	flag.StringVar(&config.GoModDst, "dst-go-mod", "go.mod", "path to go.mod destination file (default: go.mod)")
-	flag.IntVar(&config.Retries, "retries", 5, "number of downgrade retries for each module (default: 5)")
-	flag.BoolVar(&config.Changelog, "changelog", false, "print git changelog of all updated modules")
-	flag.StringVar(&config.ChangelogDest, "changelog-dest", "stdout", "Destination of the changelog (\"stdout\", \"gist\" or a filename)")
+	flag.StringVar(&Config.Format, "format", defaultFormat, "output format (console, markdown, none)")
+	flag.IntVar(&Config.Retries, "retries", 5, "number of downgrade retries for each module (default: 5)")
+	flag.BoolVar(&Config.Changelog, "changelog", false, "fetch upstream git changelog for each updated module (embedded in per-dependency commit messages when git integration is enabled; otherwise aggregated at end per -changelog-dest)")
+	flag.StringVar(&Config.ChangelogDest, "changelog-dest", "stdout", "with -changelog and -no-git (or no usable git work tree): write aggregated changelogs to stdout (default), a file path, or \"gist\"; ignored when changelogs are committed per dependency")
+	flag.BoolVar(&Config.NoGit, "no-git", false, "if true, skip all git operations (no per-dependency commits or go.mod/go.sum discard on failure)")
+	flag.StringVar(&Config.GitUserName, "user-name", "Schutzbot", "git user.name for per-dependency commits (local repo config)")
+	flag.StringVar(&Config.GitUserEmail, "user-email", "schutzbot@gmail.com", "git user.email for per-dependency commits (local repo config)")
+	flag.StringVar(&Config.ModuleProxy, "proxy", "", "module proxy base URL (default: first usable $GOPROXY entry, else https://proxy.golang.org)")
+	flag.BoolVar(&Config.FailOnError, "fail-on-error", false, "exit with status 1 if any non-excluded module failed to update")
 	flag.Parse()
 
-	config.Commands = commands
-	config.Dependencies = flag.Args()
-	config.Exclude = exclude
+	Config.Commands = commands
+	Config.Dependencies = flag.Args()
+	Config.Exclude = exclude
 }

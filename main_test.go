@@ -3,66 +3,60 @@ package main
 import (
 	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestMain(t *testing.T) {
-	executeTest := func(t *testing.T, input, output string) {
-		t.Run(input, func(t *testing.T) {
-			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-			os.Args = []string{"test", "-dry-run", "-src-go-mod", input, "-dst-go-mod", output, "-exec", "echo ok", "-format", "none"}
-			main()
-		})
-	}
-
-	executeTestPositional := func(t *testing.T, input, output, dependency string) {
-		t.Run(input, func(t *testing.T) {
-			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-			os.Args = []string{"test", "-dry-run", "-src-go-mod", input, "-dst-go-mod", output, "-exec", "echo ok", "-format", "none", dependency}
-			main()
-		})
-	}
-
-	executeTestExclude := func(t *testing.T, input, output, exclude string) {
-		t.Run(input, func(t *testing.T) {
-			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-			os.Args = []string{"test", "-dry-run", "-src-go-mod", input, "-dst-go-mod", output, "-exec", "echo ok", "-format", "none", "-exclude", exclude}
-			main()
-		})
-	}
-
-	// Clean up the project go.mod as indirect dependencies will be added
-	defer func() {
-		t.Log("Cleaning up go.mod")
-		err := exec.Command("go", "mod", "tidy").Run()
-		if err != nil {
-			t.Fatalf("failed to tidy go.mod: %v", err)
-		}
-	}()
-
-	files, err := filepath.Glob("testdata/*.in")
+func TestFixtures(t *testing.T) {
+	dirs, err := filepath.Glob("testdata/*/")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, file := range files {
-		if s, err := os.Stat(file); err != nil || s.IsDir() {
+	for _, dir := range dirs {
+		dir := dir
+		if _, err := os.Stat(filepath.Join(dir, goModFile)); err != nil {
 			continue
 		}
+		if _, err := os.Stat(filepath.Join(dir, "go.sum")); err != nil {
+			t.Fatalf("%s: missing go.sum", dir)
+		}
 
-		if strings.HasSuffix(file, "positional.in") {
-			executeTestPositional(t, file, strings.Replace(file, ".in", ".out", 1), "github.com/sirupsen/logrus")
-		} else if strings.HasSuffix(file, "exclude.in") {
-			executeTestExclude(t, file, strings.Replace(file, ".in", ".out", 1), "github.com/sirupsen/logrus")
-		} else if strings.HasSuffix(file, "exclude-no-positional.in") {
-			executeTestExclude(t, file, strings.Replace(file, ".in", ".out", 1), "github.com/sirupsen/logrus")
-		} else if strings.HasSuffix(file, "non-github.in") {
-			executeTest(t, file, strings.Replace(file, ".in", ".out", 1))
-		} else {
-			executeTest(t, file, strings.Replace(file, ".in", ".out", 1))
+		name := filepath.Base(strings.TrimSuffix(dir, string(filepath.Separator)))
+
+		switch name {
+		case "go-mod-positional":
+			t.Run(name, func(t *testing.T) {
+				runFixture(t, dir, "github.com/sirupsen/logrus")
+			})
+		case "go-mod-exclude", "go-mod-exclude-no-positional":
+			t.Run(name, func(t *testing.T) {
+				runFixture(t, dir, "-exclude", "github.com/sirupsen/logrus")
+			})
+		default:
+			t.Run(name, func(t *testing.T) {
+				runFixture(t, dir)
+			})
 		}
 	}
+}
+
+func runFixture(t *testing.T, fixtureDir string, extraArgs ...string) {
+	t.Helper()
+
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	if err := os.Chdir(fixtureDir); err != nil {
+		t.Fatal(err)
+	}
+
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	args := []string{"test", "-dry-run", "-exec", "echo ok", "-format", "none"}
+	args = append(args, extraArgs...)
+	os.Args = args
+	main()
 }

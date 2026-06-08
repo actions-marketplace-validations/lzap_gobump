@@ -2,33 +2,68 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"os"
 	"strings"
 )
 
-type Output interface {
-	Begin(text ...any)
-	Header(text string)
-	BeginPreformatted(text ...any)
-	EndPreformatted(text ...any)
-	EndPreformattedCond(render bool, text ...any)
-	End(text ...any)
-	Error(str ...string)
-	Fatal(msg string, code ...int)
-	Write(buf []byte) (int, error)
-	Println(text ...string)
-	PrintSummary(results []Result)
+var (
+	Out   *log.Logger
+	Debug *verboseLogger
+	Err   *log.Logger
+)
+
+var errCmd = fmt.Errorf("command error")
+
+// verboseLogger writes to w only when Config.Verbose is true.
+type verboseLogger struct {
+	w io.Writer
 }
 
-func joinAny(text ...any) string {
-	if len(text) == 0 {
-		return ""
-	}
+func newVerboseLogger(w io.Writer) *verboseLogger {
+	return &verboseLogger{w: w}
+}
 
-	var str []string
-	for _, t := range text {
-		str = append(str, fmt.Sprint(t))
+func (v *verboseLogger) Enabled() bool {
+	return Config != nil && Config.Verbose
+}
+
+func (v *verboseLogger) Print(a ...any) {
+	if !v.Enabled() {
+		return
 	}
-	return strings.Join(str, " ")
+	fmt.Fprint(v.w, a...)
+}
+
+func (v *verboseLogger) Println(a ...any) {
+	if !v.Enabled() {
+		return
+	}
+	fmt.Fprintln(v.w, a...)
+}
+
+func (v *verboseLogger) Printf(format string, a ...any) {
+	if !v.Enabled() {
+		return
+	}
+	fmt.Fprintf(v.w, format, a...)
+}
+
+func InitLoggers() {
+	Err = log.New(os.Stderr, "", 0)
+	Debug = newVerboseLogger(os.Stderr)
+
+	outWriter := io.Writer(os.Stdout)
+	if Config.Format == "none" {
+		outWriter = io.Discard
+	}
+	Out = log.New(outWriter, "", 0)
+}
+
+func Fatal(msg string, code int) {
+	Err.Println(msg)
+	os.Exit(code)
 }
 
 func strOrDash(str string) string {
@@ -36,4 +71,89 @@ func strOrDash(str string) string {
 		return "-"
 	}
 	return str
+}
+
+func PrintResults(results []Result) {
+	switch Config.Format {
+	case "markdown":
+		PrintMarkdownResults(results)
+	case "console":
+		PrintConsoleResults(results)
+	}
+}
+
+func printMarkdownHeader() {
+	Out.Println("## Pinned Go version dependency update")
+}
+
+func printMarkdownFooter() {
+	Out.Printf("\n:pretzel: *Created with [gobump](https://github.com/lzap/gobump) (%s)* :pretzel:\n", buildID())
+}
+
+func markdownTableRow(cells ...string) string {
+	return "| " + strings.Join(cells, " | ") + " |"
+}
+
+func markdownStatus(r Result) string {
+	if r.Excluded {
+		return "X"
+	}
+	if r.NoProxyVersions {
+		return "N"
+	}
+	if r.Success {
+		if r.VersionAfter == r.VersionBefore {
+			return "-"
+		}
+		return "U"
+	}
+	return "E"
+}
+
+func PrintMarkdownResults(results []Result) {
+	Out.Println("| Module | Status | Version |")
+	Out.Println("| --- | --- | --- |")
+	for _, r := range results {
+		Out.Println(markdownTableRow(
+			r.ModulePath,
+			markdownStatus(r),
+			strOrDash(r.VersionBefore)+" > "+strOrDash(r.VersionAfter),
+		))
+	}
+	Out.Println("Status: **U** updated, **E** error, **X** excluded, **N** no newer versions, **-** unchanged.")
+}
+
+func consoleStatus(r Result) string {
+	if r.Excluded {
+		return "excluded"
+	}
+	if r.NoProxyVersions {
+		return "noop"
+	}
+	if r.Success {
+		if r.VersionAfter == r.VersionBefore {
+			return "keep"
+		}
+		return "update"
+	}
+	return "err"
+}
+
+func printConsoleUpdate(path, version string) {
+	if Config.Format != "console" {
+		return
+	}
+	Out.Printf("go get %s@%s\n", path, version)
+}
+
+func PrintConsoleResults(results []Result) {
+	Out.Println("summary:")
+	for _, r := range results {
+		action := consoleStatus(r)
+		if r.VersionAfter != "" && r.VersionAfter != r.VersionBefore {
+			Out.Println(r.ModulePath, action, r.VersionBefore, "->", r.VersionAfter)
+		} else {
+			Out.Println(r.ModulePath, action)
+		}
+	}
 }
